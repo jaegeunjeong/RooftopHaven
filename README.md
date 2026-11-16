@@ -35,7 +35,7 @@ docs/                      기술 메모
 
 ## 게임 시계 규칙
 
-- 게임 1분 = 실제 0.5초, 하루 = 실제 12분 (`seconds_per_game_minute`로 조정)
+- 게임 1분 = 실제 1초, 게임 1시간 = 실제 1분, 하루 = 실제 24분 (`seconds_per_game_minute`로 조정)
 - 시작 시각: 1일차 06:00
 - 시간대: 아침 06–12, 낮 12–18, 저녁 18–21, 밤 21–06
 - 신호: `minute_changed`, `hour_changed`, `day_started`, `phase_changed`
