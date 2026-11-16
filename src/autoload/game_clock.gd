@@ -8,9 +8,9 @@ signal hour_changed(day: int, hour: int)
 signal day_started(day: int)
 signal phase_changed(phase: StringName)
 
-## Real seconds per in-game minute. 1.0 means 1 real minute = 1 in-game hour,
-## so one in-game day = 24 real minutes.
-@export var seconds_per_game_minute: float = 1.0
+## Real seconds per in-game minute. 0.5 means 30 real seconds = 1 in-game hour,
+## so one in-game day = 12 real minutes and a 30-day run is about 6 real hours.
+@export var seconds_per_game_minute: float = 0.5
 ## Speed multiplier (1.0 = normal). Pending design decision.
 var time_scale: float = 1.0
 
