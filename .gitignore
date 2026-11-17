@@ -12,3 +12,4 @@ export_presets.cfg
 Thumbs.db
 *.tmp
 .vscode/
+__pycache__/
