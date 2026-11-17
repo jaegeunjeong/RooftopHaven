@@ -168,6 +168,7 @@ rec('석궁', {'정밀 부품': 1, '목재': 2, '끈': 2}, needs=['기계 작업
 rec('연구대', {'회로판': 1, '유리': 2}, 'fac', ['의무실 침상'], bp=True, hrs=6)
 rec('항생제', {'희귀 의약품': 1, '알코올': 1}, needs=['연구대'], hrs=1)
 rec('정수 설비', {'철판': 3, '필터 카트리지': 2}, 'fac', ['증류기'], hrs=6)
+rec('태양광 패널', {'태양광 셀': 2, '철판': 2}, 'fac', ['기계 작업대'], hrs=6)
 rec('온실', {'유리': 6, '철판': 2}, 'fac', ['텃밭', '계단 보강'], hrs=6)
 rec('필터 카트리지', {'숯': 2, '천': 1, '플라스틱': 1}, needs=['작업대 Lv2'], hrs=1)
 rec('휴대 식량', {'통조림': 1}, needs=['화덕'], hrs=.25)
@@ -308,7 +309,7 @@ class World:
         self.garden_t = 0; self.events_seen = collections.Counter()
         self.signal = False; self.missing = []
         self.hunger_zero_h = 0
-        self.wip = None; self.first = {}
+        self.wip = None; self.first = {}; self.salvage_today = 0; self.salvage_prog = 0.0
 
     # -------- helpers
     def alive(self):
@@ -375,8 +376,9 @@ class World:
         W += [('작업대 Lv2', 1), ('철판', 2), ('철조망', 1), ('보강 문', 1)]
         if self.weather.get(d + 1) in ('rain', 'acid') or d >= 6: W += [('방수 판초', 2)]
         W += [('방한 외투', 2), ('쇠파이프', 2), ('침상', min(n, 3)), ('손도끼', 1)]
+        if self.T.get('layout4'): W += [('쥐덫', 1), ('감시탑', 1)]
         W += [('쥐덫', 1), ('텃밭', 1), ('깡통 미끼', 1), ('연료통', 1), ('계단 보강', 1), ('발전기', 1),
-              ('증류기', 1), ('소독약', 1), ('충전 배터리', 1), ('손전등', 2), ('숯', 1), ('방독 마스크', 2),
+              ('증류기', 1), ('소독약', 1)] + ([('온실', 1), ('필터 카트리지', 1), ('정수 설비', 1), ('태양광 패널', 1), ('의무실 침상', 1), ('연구대', 1)] if self.T.get('layout4') else []) + [('충전 배터리', 1), ('손전등', 2), ('숯', 1), ('방독 마스크', 2),
               ('강화 철판', 2), ('회로판', 1), ('기계 작업대', 1),
               ('강화 철판', 3), ('강화 바리케이드', 1), ('전기 울타리', 1), ('강화 철판', 2), ('감시탑', 1),
               ('온실', 1), ('필터 카트리지', 2), ('정수 설비', 1), ('의무실 침상', 1), ('무전 안테나', 1), ('축전지 팩', 1), ('회로판', 2), ('무전 중계기', 1),
@@ -418,10 +420,31 @@ class World:
                     if self.can_build(name, count_block=first):
                         pick = name; break
                     first = False
+                    # make a missing intermediate (철판, 끈, 숯 ...) for this target if possible
+                    sub = None
+                    r0 = R[name]
+                    if not (r0['bp'] and name not in self.bp) and all(self.has(x) for x in r0['needs']):
+                        for m, v in r0['cost'].items():
+                            if self.inv[m] < v and m in R and R[m]['kind'] == 'item' and not (set(R[m]['cost']) & reserved) \
+                                    and self.can_build(m, count_block=False):
+                                sub = m; break
+                    if sub:
+                        pick = sub; break
                     # keep scarce materials for the higher-priority target that is waiting on them
                     if len(reserved) < 6 and not (R[name]['bp'] and name not in self.bp):
                         reserved |= {k for k, v in R[name]['cost'].items() if self.inv[k] < v * 2}
                 if pick is None:
+                    sv = self.T.get('salvage')
+                    if sv and self.salvage_today < sv['cap']:
+                        # dismantle debris in the building: sv['h'] hours per unit
+                        self.salvage_prog += budget
+                        while self.salvage_prog >= sv['h'] and self.salvage_today < sv['cap']:
+                            self.salvage_prog -= sv['h']; self.salvage_today += 1
+                            m = self.rng.choices(['목재', '고철', '천', '플라스틱'], sv['w'])[0]
+                            self.inv[m] += 1; self.log['salvage'] += 1
+                            if self.salvage_today == 1: self.trace += 1
+                        self.log['salvage_h'] += budget
+                        return
                     self.log['idle_h'] += budget; return
                 # reserve materials now
                 r = R[pick]
@@ -848,7 +871,7 @@ class World:
         if self.fac['감시탑']: gval = int(gval * 1.5)
         defense = dfn + gval + weap
         minus = sum(R[x['name']].get('minus', 0) for x in self.dfn if not (R[x['name']].get('power') and self.inv['연료'] < 1))
-        if any(R[x['name']].get('power') for x in self.dfn) and self.inv['연료']:
+        if any(R[x['name']].get('power') for x in self.dfn) and self.inv['연료'] and not (self.fac['태양광 패널'] and w == 'clear'):
             self.inv['연료'] -= 1  # ASSUME ~ one fuel powers the fence for a night
         raids = []
         # infected
@@ -921,6 +944,7 @@ class World:
     # -------- main loop
     def morning(self):
         d = self.day; w = self.weather[d]
+        self.salvage_today = 0
         # trace decay
         self.trace = max(0, self.trace - 3 - (2 if w == 'rain' else 0))
         # daily morale from food variety (yesterday)

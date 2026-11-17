@@ -55,7 +55,12 @@ ROUND3=_c.deepcopy(ROUND2_FIX); ROUND3['guard_cap']=4
 ROUND3['day_tbl']=[(1,5,2,None,0,None),(6,10,4,5,0,5),(11,15,5,6,.02,0),(16,20,8,9,.04,-5),(21,25,11,12,.06,-10),(26,30,13,14,.08,-10)]
 ROUND3['loot_add']['pharmacy']={'화학품':(3,5),'천':(1,2)}
 ROUND3['rare_set']={'pharmacy':[('BP증류기',1,.40),('희귀 의약품',1,.15),('소독약',1,.30)]}
-SCENARIOS={'round3':ROUND3,'round2':ROUND2,'round2_fix':ROUND2_FIX,'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
+ROUND4=_c.deepcopy(ROUND3); ROUND4['layout4']=True
+ROUND4['recipe_cost'].update({'온실':{'유리':4,'철판':2},'정수 설비':{'철판':2,'필터 카트리지':1},'감시탑':{'철판':3,'목재':4}})
+ROUND4['recipe_needs']={'온실':['텃밭'],'정수 설비':['증류기'],'연구대':['의무실 침상','증류기'],'태양광 패널':['발전기'],'감시탑':['바리케이드','작업대 Lv2']}
+ROUND4['no_bp']=['연구대']
+ROUND4S=_c.deepcopy(ROUND4); ROUND4S['salvage']=dict(h=2, cap=3, w=[4,3,2,1])
+SCENARIOS={'round4s':ROUND4S,'round4':ROUND4,'round3':ROUND3,'round2':ROUND2,'round2_fix':ROUND2_FIX,'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
 
 if __name__=='__main__':
     # usage: python3 exp.py <scenario> <smart|noanswer> <runs>
