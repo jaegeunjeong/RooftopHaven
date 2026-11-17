@@ -23,8 +23,9 @@ def drow(day):
             return r
     return DAY_TABLE[-1]
 
+STAGE2 = [16]
 def stage(day):
-    return 0 if day <= 5 else (1 if day <= 15 else 2)
+    return 0 if day <= 5 else (1 if day < STAGE2[0] else 2)
 
 WEATHER_P = [
     {'clear': 55, 'rain': 30, 'fog': 15},
@@ -90,7 +91,8 @@ LOC = {
 }
 TEAM_LOOT = {1: 1.0, 2: 1.8, 3: 2.5}
 BASE_T = dict(loot_add={}, regen=0.0, rain=4, rain_wet=10, filter=20, raider_first=(6, 8),
-              garden=(3, 3), start_extra={}, raider_tbl=None, decay=None, can=(25, 30), inf_base=0.0)
+              garden=(3, 3), start_extra={}, raider_tbl=None, decay=None, can=(25, 30), inf_base=0.0, late_start=16, down_mid=False, rare_add={},
+              teams='antenna', recipe_cost={})
 TEAM_INJ = {1: 1.0, 2: 0.8, 3: 0.6}
 
 # ---------------------------------------------------------------- recipes
@@ -168,6 +170,7 @@ rec('정수 설비', {'철판': 3, '필터 카트리지': 2}, 'fac', ['증류기
 rec('필터 카트리지', {'숯': 2, '천': 1, '플라스틱': 1}, needs=['작업대 Lv2'], hrs=1)
 rec('휴대 식량', {'통조림': 1}, needs=['화덕'], hrs=.25)
 
+R_DEFAULT = {k: dict(v['cost']) for k, v in R.items()}
 JOBS = ['정비공', '달리기 선수', '간호사', '요리사', '전직 경찰', '농부']
 
 # ---------------------------------------------------------------- events (base probs, notes 04-13)
@@ -232,12 +235,12 @@ def EV():
         dict(n='펌프', needjobor=('정비공', '해체 공구 세트'), p=.75, s=dict(fuel=4), f=dict(h=1)),
         dict(n='비튼다', need='쇠지렛대', p=.60, s=dict(items={'연료': 3}), f=dict(tr=2, L=1)),
     ])
-    ev('dark', lambda c: c['loc'] in ('subway', 'down') and c['day'] >= 16, [
+    ev('dark', lambda c: c['loc'] in ('subway', 'down') and c['day'] >= STAGE2[0], [
         dict(n='돌아 나온다', d=True, p=1, s=dict(half=1), f={}),
         dict(n='불 비추기', needany=['손전등'], p=.80, s={}, f=dict(L=1)),
         dict(n='따라간다', p=.50, tag='search', bon=[('전직 경찰', 15), ('석궁', 15)], s=dict(rec=.5, rare=1), f=dict(S=1)),
     ])
-    ev('crate', lambda c: c['day'] >= 16, [
+    ev('crate', lambda c: c['day'] >= STAGE2[0], [
         dict(n='지켜본 뒤', d=True, p=.80, s=dict(h=2, items={'통조림': 4, '생수': 4}, bp=.3), f=dict(h=2)),
         dict(n='바로 연다', p=.55, s=dict(items={'통조림': 4, '생수': 4}, bp=.3), f=dict(chain=('ambush', 1))),
         dict(n='위장 망토', need='위장 망토', p=.90, s=dict(items={'통조림': 4, '생수': 4}, bp=.3), f=dict(chain=('ambush', 1))),
@@ -262,10 +265,16 @@ class World:
     def __init__(self, seed, policy, T=None):
         self.rng = random.Random(seed); self.policy = policy
         self.T = dict(BASE_T); self.T.update(T or {})
+        STAGE2[0] = self.T['late_start']
+        for k, v in R_DEFAULT.items(): R[k]['cost'] = dict(v)
+        for k, v in self.T['recipe_cost'].items(): R[k]['cost'] = dict(v)
         import copy
         self.LOC = copy.deepcopy(LOC)
         for k, extra in self.T['loot_add'].items():
             self.LOC[k]['main'].update(extra)
+        for k, extra in self.T['rare_add'].items():
+            self.LOC[k]['rare'] += extra
+        if self.T['down_mid']: self.LOC['down']['st'] = 1
         self.day = 1; self.hour = 6
         self.inv = collections.Counter({'통조림': 8, '생수': 8, '오염수': 4, '고철': 6, '목재': 6, '천': 4,
                                         '플라스틱': 3, '연료': 3})
@@ -355,11 +364,11 @@ class World:
         W += [('작업대 Lv2', 1), ('철판', 2), ('철조망', 1), ('보강 문', 1)]
         if self.weather.get(d + 1) in ('rain', 'acid') or d >= 6: W += [('방수 판초', 2)]
         W += [('방한 외투', 2), ('쇠파이프', 2), ('침상', min(n, 3)), ('손도끼', 1)]
-        W += [('쥐덫', 1), ('텃밭', 1), ('증류기', 1), ('소독약', 1), ('의무실 침상', 1), ('재봉대', 1),
-              ('발전기', 1), ('무전 안테나', 1), ('깡통 미끼', 1), ('연료통', 1), ('계단 보강', 1),
-              ('숯', 1), ('방독 마스크', 2), ('충전 배터리', 1), ('손전등', 2), ('봉합 키트', 1),
-              ('미끼 폭죽', 1), ('연막탄', 1), ('갈고리 밧줄', 1), ('강화 철판', 2), ('회로판', 1),
-              ('기계 작업대', 1), ('강화 철판', 3), ('강화 바리케이드', 1), ('전기 울타리', 1), ('감시탑', 1),
+        W += [('쥐덫', 1), ('텃밭', 1), ('깡통 미끼', 1), ('연료통', 1), ('계단 보강', 1), ('발전기', 1),
+              ('충전 배터리', 1), ('손전등', 2), ('숯', 1), ('방독 마스크', 2), ('강화 철판', 2), ('회로판', 1),
+              ('기계 작업대', 1), ('증류기', 1), ('소독약', 1), ('의무실 침상', 1), ('재봉대', 1), ('무전 안테나', 1),
+              ('봉합 키트', 1), ('미끼 폭죽', 1), ('연막탄', 1), ('갈고리 밧줄', 1),
+              ('강화 철판', 3), ('강화 바리케이드', 1), ('전기 울타리', 1), ('감시탑', 1),
               ('축전지 팩', 1), ('회로판', 2), ('무전 중계기', 1), ('침상', n), ('철조망', 2), ('바리케이드', 2),
               ('훈연기', 1), ('방호복', 1), ('석궁', 2), ('연구대', 1), ('항생제', 1)]
         return W
@@ -589,7 +598,11 @@ class World:
     def dispatch(self):
         d = self.day; w = self.weather[d]
         if d >= DAYS: return
-        teams_max = 2 if self.fac['무전 안테나'] else 1
+        if self.T['teams'] == 'antenna':
+            teams_max = 2 if self.fac['무전 안테나'] else 1
+        else:
+            na = len(self.alive())
+            teams_max = 1 if na <= 3 else (3 if na >= 6 and self.fac['무전 안테나'] else 2)
         active = len({p.exp['tid'] for p in self.alive() if p.exp})
         if active >= teams_max: return
         desperate = self.food_days() < 1 or self.water_units() < len(self.alive())

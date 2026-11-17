@@ -29,7 +29,7 @@ def summary(res):
         raids={b:dict(v) for b,v in rd.items()}, curve=curve,
         exp={k[4:]:v/n for k,v in L.items() if k.startswith('exp:')},
         built={k[6:]:round(v/n,2) for k,v in L.items() if k.startswith('built:') and v/n>=.2},
-        milestones={m:(sum(1 for r in res if m in r['first'])/n, st.median([r['first'][m] for r in res if m in r['first']] or [0])) for m in ('바리케이드','깡통 경보기','작업대 Lv2','증류기','재봉대','발전기','무전 안테나','계단 보강','방독 마스크','기계 작업대','강화 바리케이드')},
+        milestones={m:(sum(1 for r in res if m in r['first'])/n, st.median([r['first'][m] for r in res if m in r['first']] or [0])) for m in ('바리케이드','깡통 경보기','작업대 Lv2','증류기','재봉대','발전기','무전 안테나','계단 보강','방독 마스크','손전등','강화 철판','회로판','기계 작업대','강화 바리케이드','전기 울타리','감시탑','무전 중계기')},
         bp={k[3:]:round(v/n,2) for k,v in L.items() if k.startswith('bp:')},
         joined=L['joined']/n, revive=L['revive']/n, starving_h=L['starving_h']/n, stolen=L['stolen']/n, broken=L['fac_broken']/n)
 def show(name, s):
@@ -46,7 +46,12 @@ PROPOSAL=dict(T2); PROPOSAL['can']=(25,30); PROPOSAL['inf_base']=0.15
 PROPOSAL['decay']={'rest':(1.2,2.0,1.0),'work':(1.6,2.5,4.0),'exp':(2.2,3.2,5.0),'sleep':(1.0,1.5,0.0)}
 NOFOOD=dict(PROPOSAL); NOFOOD['loot_add']={'clothes':{'목재':(1,2),'고철':(0,1)}}
 CONSUME=dict(decay=T2['decay'], can=(30,35))
-SCENARIOS={'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
+ROUND2=dict(PROPOSAL); ROUND2.update(late_start=20, down_mid=True, teams='size',
+    rare_add={'down':[('BP기계 작업대',1,.25)],'hardware':[('전자 부품',1,.30)],'gas':[('정밀 부품',1,.25)]})
+import copy as _c
+ROUND2_FIX=_c.deepcopy(ROUND2); ROUND2_FIX['recipe_cost']={'계단 보강':{'철판':2,'목재':3}}
+ROUND2_FIX['loot_add']['clothes']['목재']=(2,3); ROUND2_FIX['loot_add'].setdefault('hardware',{})['목재']=(2,3)
+SCENARIOS={'round2':ROUND2,'round2_fix':ROUND2_FIX,'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
 
 if __name__=='__main__':
     # usage: python3 exp.py <scenario> <smart|noanswer> <runs>
