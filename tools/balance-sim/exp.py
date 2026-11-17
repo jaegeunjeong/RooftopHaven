@@ -12,7 +12,7 @@ def summary(res):
     for r in res:
         for d in r['daily']:
             for kind,stg,dfn,m in d['raids']:
-                band='1~5' if d['day']<=5 else '6~15' if d['day']<=15 else '16~30'
+                band='1~5' if d['day']<=5 else '6~19' if d['day']<=19 else '20~30'
                 res_='완벽' if m>=2 else '막음' if m>=0 else '일부 뚫림' if m>=-2 else '크게 뚫림'
                 rd[band][res_]+=1
     # daily averages
@@ -29,7 +29,7 @@ def summary(res):
         raids={b:dict(v) for b,v in rd.items()}, curve=curve,
         exp={k[4:]:v/n for k,v in L.items() if k.startswith('exp:')},
         built={k[6:]:round(v/n,2) for k,v in L.items() if k.startswith('built:') and v/n>=.2},
-        milestones={m:(sum(1 for r in res if m in r['first'])/n, st.median([r['first'][m] for r in res if m in r['first']] or [0])) for m in ('바리케이드','깡통 경보기','작업대 Lv2','증류기','재봉대','발전기','무전 안테나','계단 보강','방독 마스크','손전등','강화 철판','회로판','기계 작업대','강화 바리케이드','전기 울타리','감시탑','무전 중계기')},
+        milestones={m:(sum(1 for r in res if m in r['first'])/n, st.median([r['first'][m] for r in res if m in r['first']] or [0])) for m in ('바리케이드','깡통 경보기','작업대 Lv2','증류기','재봉대','발전기','무전 안테나','계단 보강','방독 마스크','손전등','강화 철판','회로판','기계 작업대','강화 바리케이드','전기 울타리','감시탑','무전 중계기','온실','정수 설비','연구대')},
         bp={k[3:]:round(v/n,2) for k,v in L.items() if k.startswith('bp:')},
         joined=L['joined']/n, revive=L['revive']/n, starving_h=L['starving_h']/n, stolen=L['stolen']/n, broken=L['fac_broken']/n)
 def show(name, s):
@@ -51,7 +51,11 @@ ROUND2=dict(PROPOSAL); ROUND2.update(late_start=20, down_mid=True, teams='size',
 import copy as _c
 ROUND2_FIX=_c.deepcopy(ROUND2); ROUND2_FIX['recipe_cost']={'계단 보강':{'철판':2,'목재':3}}
 ROUND2_FIX['loot_add']['clothes']['목재']=(2,3); ROUND2_FIX['loot_add'].setdefault('hardware',{})['목재']=(2,3)
-SCENARIOS={'round2':ROUND2,'round2_fix':ROUND2_FIX,'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
+ROUND3=_c.deepcopy(ROUND2_FIX); ROUND3['guard_cap']=4
+ROUND3['day_tbl']=[(1,5,2,None,0,None),(6,10,4,5,0,5),(11,15,5,6,.02,0),(16,20,8,9,.04,-5),(21,25,11,12,.06,-10),(26,30,13,14,.08,-10)]
+ROUND3['loot_add']['pharmacy']={'화학품':(3,5),'천':(1,2)}
+ROUND3['rare_set']={'pharmacy':[('BP증류기',1,.40),('희귀 의약품',1,.15),('소독약',1,.30)]}
+SCENARIOS={'round3':ROUND3,'round2':ROUND2,'round2_fix':ROUND2_FIX,'current':None, 'consume':CONSUME, 'proposal':PROPOSAL, 'proposal_nofood':NOFOOD, 'generous':T2}
 
 if __name__=='__main__':
     # usage: python3 exp.py <scenario> <smart|noanswer> <runs>

@@ -17,8 +17,9 @@ DAY_TABLE = [  # (from, to, infected base, raider str, injury add, event mod)
     (1, 5, 2, None, 0.00, None), (6, 10, 4, 5, 0.00, 5), (11, 15, 5, 6, 0.02, 0),
     (16, 20, 7, 8, 0.04, -5), (21, 25, 8, 9, 0.06, -10), (26, 30, 9, 10, 0.08, -10)]
 
+CUR_TBL = [DAY_TABLE]
 def drow(day):
-    for r in DAY_TABLE:
+    for r in CUR_TBL[0]:
         if r[0] <= day <= r[1]:
             return r
     return DAY_TABLE[-1]
@@ -92,7 +93,7 @@ LOC = {
 TEAM_LOOT = {1: 1.0, 2: 1.8, 3: 2.5}
 BASE_T = dict(loot_add={}, regen=0.0, rain=4, rain_wet=10, filter=20, raider_first=(6, 8),
               garden=(3, 3), start_extra={}, raider_tbl=None, decay=None, can=(25, 30), inf_base=0.0, late_start=16, down_mid=False, rare_add={},
-              teams='antenna', recipe_cost={})
+              teams='antenna', recipe_cost={}, day_tbl=None, guard_cap=99, rare_set={}, recipe_needs={})
 TEAM_INJ = {1: 1.0, 2: 0.8, 3: 0.6}
 
 # ---------------------------------------------------------------- recipes
@@ -167,10 +168,13 @@ rec('석궁', {'정밀 부품': 1, '목재': 2, '끈': 2}, needs=['기계 작업
 rec('연구대', {'회로판': 1, '유리': 2}, 'fac', ['의무실 침상'], bp=True, hrs=6)
 rec('항생제', {'희귀 의약품': 1, '알코올': 1}, needs=['연구대'], hrs=1)
 rec('정수 설비', {'철판': 3, '필터 카트리지': 2}, 'fac', ['증류기'], hrs=6)
+rec('온실', {'유리': 6, '철판': 2}, 'fac', ['텃밭', '계단 보강'], hrs=6)
 rec('필터 카트리지', {'숯': 2, '천': 1, '플라스틱': 1}, needs=['작업대 Lv2'], hrs=1)
 rec('휴대 식량', {'통조림': 1}, needs=['화덕'], hrs=.25)
 
 R_DEFAULT = {k: dict(v['cost']) for k, v in R.items()}
+R_NEEDS = {k: list(v['needs']) for k, v in R.items()}
+R_BP = {k: v['bp'] for k, v in R.items()}
 JOBS = ['정비공', '달리기 선수', '간호사', '요리사', '전직 경찰', '농부']
 
 # ---------------------------------------------------------------- events (base probs, notes 04-13)
@@ -268,12 +272,19 @@ class World:
         STAGE2[0] = self.T['late_start']
         for k, v in R_DEFAULT.items(): R[k]['cost'] = dict(v)
         for k, v in self.T['recipe_cost'].items(): R[k]['cost'] = dict(v)
+        for k, v in R_NEEDS.items(): R[k]['needs'] = list(v)
+        for k, v in self.T['recipe_needs'].items(): R[k]['needs'] = list(v)
+        for k, v in R_BP.items(): R[k]['bp'] = v
+        for k in self.T.get('no_bp', []): R[k]['bp'] = False
+        CUR_TBL[0] = self.T['day_tbl'] or DAY_TABLE
         import copy
         self.LOC = copy.deepcopy(LOC)
         for k, extra in self.T['loot_add'].items():
             self.LOC[k]['main'].update(extra)
         for k, extra in self.T['rare_add'].items():
             self.LOC[k]['rare'] += extra
+        for k, rares in self.T['rare_set'].items():
+            self.LOC[k]['rare'] = list(rares)
         if self.T['down_mid']: self.LOC['down']['st'] = 1
         self.day = 1; self.hour = 6
         self.inv = collections.Counter({'통조림': 8, '생수': 8, '오염수': 4, '고철': 6, '목재': 6, '천': 4,
@@ -305,7 +316,7 @@ class World:
     def home(self):
         return [p for p in self.ppl if p.alive and p.where == 'home']
     def has(self, item, n=1):
-        return self.inv[item] >= n or self.fac[item] >= n
+        return self.inv[item] >= n or self.fac[item] >= n or self.dcount(item) >= n
     def jobs_home(self, job):
         return any(p.job == job for p in self.home())
     def cap(self):
@@ -365,11 +376,12 @@ class World:
         if self.weather.get(d + 1) in ('rain', 'acid') or d >= 6: W += [('방수 판초', 2)]
         W += [('방한 외투', 2), ('쇠파이프', 2), ('침상', min(n, 3)), ('손도끼', 1)]
         W += [('쥐덫', 1), ('텃밭', 1), ('깡통 미끼', 1), ('연료통', 1), ('계단 보강', 1), ('발전기', 1),
-              ('충전 배터리', 1), ('손전등', 2), ('숯', 1), ('방독 마스크', 2), ('강화 철판', 2), ('회로판', 1),
-              ('기계 작업대', 1), ('증류기', 1), ('소독약', 1), ('의무실 침상', 1), ('재봉대', 1), ('무전 안테나', 1),
-              ('봉합 키트', 1), ('미끼 폭죽', 1), ('연막탄', 1), ('갈고리 밧줄', 1),
-              ('강화 철판', 3), ('강화 바리케이드', 1), ('전기 울타리', 1), ('감시탑', 1),
-              ('축전지 팩', 1), ('회로판', 2), ('무전 중계기', 1), ('침상', n), ('철조망', 2), ('바리케이드', 2),
+              ('증류기', 1), ('소독약', 1), ('충전 배터리', 1), ('손전등', 2), ('숯', 1), ('방독 마스크', 2),
+              ('강화 철판', 2), ('회로판', 1), ('기계 작업대', 1),
+              ('강화 철판', 3), ('강화 바리케이드', 1), ('전기 울타리', 1), ('강화 철판', 2), ('감시탑', 1),
+              ('온실', 1), ('필터 카트리지', 2), ('정수 설비', 1), ('의무실 침상', 1), ('무전 안테나', 1), ('축전지 팩', 1), ('회로판', 2), ('무전 중계기', 1),
+              ('재봉대', 1), ('봉합 키트', 1), ('미끼 폭죽', 1), ('연막탄', 1), ('갈고리 밧줄', 1),
+              ('침상', n), ('철조망', 2), ('바리케이드', 2),
               ('훈연기', 1), ('방호복', 1), ('석궁', 2), ('연구대', 1), ('항생제', 1)]
         return W
 
@@ -829,6 +841,7 @@ class World:
         home = [p for p in self.home() if p.hp > 29]
         has_alarm = self.fac['깡통 경보기'] or self.fac['경보 사이렌']
         guards = len(home) if has_alarm else min(1, len(home))
+        guards = min(guards, self.T['guard_cap'])
         gval = sum(2 if p.job == '전직 경찰' else 1 for p in home[:guards]) if home else 0
         weap = min(guards, self.inv['쇠파이프'] + 2 * self.inv['석궁'])
         dfn = sum(R[x['name']]['dfn'] for x in self.dfn if not (R[x['name']].get('power') and self.inv['연료'] < 1))
@@ -935,6 +948,10 @@ class World:
             if self.garden_t % self.T['garden'][0] == 0:
                 g = self.T['garden'][1]
                 self.raw += [(d, '식재료')] * (int(g * 1.5) if self.jobs_home('농부') else g)
+        if self.fac['온실'] and d % 2 == 0:
+            self.raw += [(d, '식재료')] * 4
+        if self.fac['정수 설비']:
+            self.inv['정수된 물'] += 10
         # visitors
         if d >= 6 and self.rng.random() < (.10 if self.fac['무전 안테나'] else .05):
             self.offer_recruit()
