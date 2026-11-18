@@ -1,0 +1,135 @@
+{
+	"prototype": {
+		"run_days": 10,
+		"helicopter_hour": 12,
+		"helicopter_wait_hours": 2
+	},
+	"start": {
+		"day": 1,
+		"hour": 6,
+		"morale": 60,
+		"stats": 80,
+		"survivors": [
+			{
+				"name": "NAME_DOYUN",
+				"job": "mechanic"
+			},
+			{
+				"name": "NAME_HARIN",
+				"job": "runner"
+			},
+			{
+				"name": "NAME_SEOYEON",
+				"job": "nurse"
+			}
+		],
+		"inventory": {
+			"canned_food": 8,
+			"bottled_water": 8,
+			"dirty_water": 4,
+			"scrap": 6,
+			"wood": 6,
+			"cloth": 4,
+			"plastic": 3,
+			"fuel": 3,
+			"cloth_bag": 3
+		}
+	},
+	"stats": {
+		"range": [
+			0,
+			100
+		],
+		"bands": {
+			"normal": 60,
+			"caution": 30,
+			"danger": 1
+		},
+		"decay_per_hour": {
+			"food": {
+				"rest": 1.2,
+				"sleep": 1.0,
+				"work": 1.6,
+				"expedition": 2.2
+			},
+			"water": {
+				"rest": 2.0,
+				"sleep": 1.5,
+				"work": 2.5,
+				"expedition": 3.2
+			},
+			"stamina": {
+				"rest": 1.0,
+				"sleep": 0.0,
+				"work": 4.0,
+				"expedition": 5.0
+			}
+		},
+		"sleep_gain_floor": 5,
+		"heat_wave_water_mult": 2.0,
+		"natural_heal": {
+			"per_hour": 1,
+			"needs_food": 50,
+			"needs_water": 50,
+			"only_resting": true
+		},
+		"at_zero_health_per_hour": {
+			"food": 2,
+			"water": 4
+		},
+		"danger_effects": {
+			"food_work_mult": 0.75,
+			"water_work_mult": 0.75,
+			"stamina_work_mult": 0.5
+		},
+		"stamina_zero": {
+			"sleep_hours": 2,
+			"morale": -2
+		},
+		"collapse": {
+			"death_after_hours": 6,
+			"revive_health": 30
+		}
+	},
+	"auto": {
+		"eat_below": 50,
+		"drink_below": 50,
+		"sleep_from_hour": 22,
+		"wake_hour": 6,
+		"sleep_if_stamina_below": 30,
+		"work_from_hour": 9,
+		"work_to_hour": 17
+	},
+	"morale": {
+		"start": 60,
+		"high": 80,
+		"high_work_mult": 1.1,
+		"low": 30,
+		"low_work_mult": 0.75,
+		"refuse_chance": 0.1,
+		"zero_leave_chance": 0.2,
+		"zero_lose_hours": 24,
+		"daily": {
+			"same_food_two_days": -3,
+			"two_food_kinds": 2,
+			"injury": -5,
+			"death": -25,
+			"stamina_collapse": -2,
+			"big_success": 8
+		}
+	},
+	"storage": {
+		"base_slots": 40,
+		"stack": 10
+	},
+	"build": {
+		"hours": {
+			"early": 2,
+			"mid": 4,
+			"late": 6
+		},
+		"accident_chance": 0.01,
+		"accident_chance_tired": 0.05
+	},
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

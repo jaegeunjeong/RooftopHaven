@@ -1,0 +1,237 @@
+{
+	"list": [
+		{
+			"id": "scrap",
+			"name": "ITEM_SCRAP",
+			"category": "material"
+		},
+		{
+			"id": "wood",
+			"name": "ITEM_WOOD",
+			"category": "material"
+		},
+		{
+			"id": "cloth",
+			"name": "ITEM_CLOTH",
+			"category": "material"
+		},
+		{
+			"id": "plastic",
+			"name": "ITEM_PLASTIC",
+			"category": "material"
+		},
+		{
+			"id": "chemicals",
+			"name": "ITEM_CHEMICALS",
+			"category": "material"
+		},
+		{
+			"id": "fuel",
+			"name": "ITEM_FUEL",
+			"category": "material"
+		},
+		{
+			"id": "battery",
+			"name": "ITEM_BATTERY",
+			"category": "material"
+		},
+		{
+			"id": "leather",
+			"name": "ITEM_LEATHER",
+			"category": "material"
+		},
+		{
+			"id": "parts",
+			"name": "ITEM_PARTS",
+			"category": "material"
+		},
+		{
+			"id": "ingredients",
+			"name": "ITEM_INGREDIENTS",
+			"category": "food_raw",
+			"spoil_days": 3
+		},
+		{
+			"id": "small_meat",
+			"name": "ITEM_SMALL_MEAT",
+			"category": "food_raw",
+			"spoil_days": 1
+		},
+		{
+			"id": "dirty_water",
+			"name": "ITEM_DIRTY_WATER",
+			"category": "water_raw",
+			"water": 30,
+			"sickness": {
+				"state": "upset",
+				"chance": 0.4
+			}
+		},
+		{
+			"id": "canned_food",
+			"name": "ITEM_CANNED_FOOD",
+			"category": "food",
+			"food": 25,
+			"spoil_days": null
+		},
+		{
+			"id": "bottled_water",
+			"name": "ITEM_BOTTLED_WATER",
+			"category": "water",
+			"water": 30
+		},
+		{
+			"id": "clean_water",
+			"name": "ITEM_CLEAN_WATER",
+			"category": "water",
+			"water": 30
+		},
+		{
+			"id": "rope",
+			"name": "ITEM_ROPE",
+			"category": "material"
+		},
+		{
+			"id": "heated_can",
+			"name": "ITEM_HEATED_CAN",
+			"category": "food",
+			"food": 30,
+			"morale": 1,
+			"eat_now": true
+		},
+		{
+			"id": "veggie_soup",
+			"name": "ITEM_VEGGIE_SOUP",
+			"category": "food",
+			"food": 40,
+			"water": 10,
+			"spoil_days": 2
+		},
+		{
+			"id": "ration",
+			"name": "ITEM_RATION",
+			"category": "consumable",
+			"food": 30,
+			"auto_use": {
+				"stat": "food",
+				"below": 40
+			}
+		},
+		{
+			"id": "hammer",
+			"name": "ITEM_HAMMER",
+			"category": "tool",
+			"durability": 30
+		},
+		{
+			"id": "crowbar",
+			"name": "ITEM_CROWBAR",
+			"category": "tool",
+			"slot": "tool",
+			"durability": 10
+		},
+		{
+			"id": "iron_pipe",
+			"name": "ITEM_IRON_PIPE",
+			"category": "tool",
+			"slot": "tool",
+			"durability": 10,
+			"guard_bonus": 1
+		},
+		{
+			"id": "hatchet",
+			"name": "ITEM_HATCHET",
+			"category": "tool",
+			"slot": "tool",
+			"durability": 10,
+			"loot_bonus": {
+				"wood": 2
+			}
+		},
+		{
+			"id": "water_filter",
+			"name": "ITEM_WATER_FILTER",
+			"category": "survival",
+			"durability": 30
+		},
+		{
+			"id": "canteen",
+			"name": "ITEM_CANTEEN",
+			"category": "survival",
+			"slot": "survival",
+			"durability": 10,
+			"expedition": {
+				"water_decay_mult": 0.75
+			}
+		},
+		{
+			"id": "sleeping_bag",
+			"name": "ITEM_SLEEPING_BAG",
+			"category": "survival",
+			"slot": "survival",
+			"durability": 10,
+			"sleep_gain": 8,
+			"cold_chance_mult": 0.5
+		},
+		{
+			"id": "poncho",
+			"name": "ITEM_PONCHO",
+			"category": "clothing",
+			"slot": "clothing",
+			"durability": 3,
+			"blocks": [
+				"wet"
+			]
+		},
+		{
+			"id": "warm_coat",
+			"name": "ITEM_WARM_COAT",
+			"category": "clothing",
+			"slot": "clothing",
+			"durability": 10,
+			"cold_chance_mult": 0.5
+		},
+		{
+			"id": "padded_workwear",
+			"name": "ITEM_PADDED_WORKWEAR",
+			"category": "clothing",
+			"slot": "clothing",
+			"durability": 8,
+			"injury_mult": 0.9
+		},
+		{
+			"id": "cloth_bag",
+			"name": "ITEM_CLOTH_BAG",
+			"category": "bag",
+			"slots": 8
+		},
+		{
+			"id": "bandage",
+			"name": "ITEM_BANDAGE",
+			"category": "medical",
+			"treats": "light",
+			"health": 15,
+			"auto_use_on_expedition": true
+		},
+		{
+			"id": "disinfectant",
+			"name": "ITEM_DISINFECTANT",
+			"category": "medical",
+			"treats": "infected",
+			"health_with_bandage": 30
+		},
+		{
+			"id": "splint",
+			"name": "ITEM_SPLINT",
+			"category": "medical",
+			"treats": "serious_first_aid"
+		},
+		{
+			"id": "can_lure",
+			"name": "ITEM_CAN_LURE",
+			"category": "consumable",
+			"slot": "consumable"
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

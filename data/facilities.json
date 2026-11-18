@@ -1,0 +1,169 @@
+{
+	"list": [
+		{
+			"id": "workbench",
+			"name": "FAC_WORKBENCH",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {},
+			"requires": [],
+			"build_hours": 0,
+			"built_at_start": true,
+			"effects": {
+				"station": "workbench"
+			}
+		},
+		{
+			"id": "rain_collector",
+			"name": "FAC_RAIN_COLLECTOR",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {},
+			"requires": [],
+			"build_hours": 0,
+			"built_at_start": true,
+			"effects": {
+				"daily": {
+					"dirty_water": 6
+				},
+				"daily_rain": {
+					"dirty_water": 12
+				}
+			}
+		},
+		{
+			"id": "stove",
+			"name": "FAC_STOVE",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"scrap": 3,
+				"wood": 2
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"station": "stove",
+				"fire_hours_per_fuel": 4
+			}
+		},
+		{
+			"id": "bed",
+			"name": "FAC_BED",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"wood": 3,
+				"cloth": 2
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"sleep_gain": 7,
+				"sleepers": 1
+			}
+		},
+		{
+			"id": "storage_shelf",
+			"name": "FAC_STORAGE_SHELF",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"wood": 4
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"storage_slots": 20
+			}
+		},
+		{
+			"id": "barricade",
+			"name": "FAC_BARRICADE",
+			"tier": "early",
+			"kind": "defense",
+			"cost": {
+				"wood": 4,
+				"scrap": 2
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"defense": 1,
+				"durability": 5
+			}
+		},
+		{
+			"id": "nail_board",
+			"name": "FAC_NAIL_BOARD",
+			"tier": "early",
+			"kind": "defense",
+			"cost": {
+				"wood": 2,
+				"scrap": 1
+			},
+			"requires": [],
+			"build_hours": 1,
+			"built_at_start": false,
+			"effects": {
+				"defense": 1,
+				"infected_strength": -1,
+				"breaks_after_raids": 3
+			}
+		},
+		{
+			"id": "can_alarm",
+			"name": "FAC_CAN_ALARM",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"scrap": 2,
+				"rope": 1
+			},
+			"requires": [],
+			"build_hours": 1,
+			"built_at_start": false,
+			"effects": {
+				"alarm": true
+			}
+		},
+		{
+			"id": "rat_trap",
+			"name": "FAC_RAT_TRAP",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"wood": 2,
+				"scrap": 1,
+				"rope": 1
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"daily_random": {
+					"small_meat": [
+						0,
+						2
+					]
+				},
+				"daily_trace": 1
+			}
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

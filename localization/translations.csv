@@ -6,3 +6,105 @@ PHASE_MORNING,Morning,아침
 PHASE_DAY,Day,낮
 PHASE_EVENING,Evening,저녁
 PHASE_NIGHT,Night,밤
+ITEM_SCRAP,Scrap metal,고철
+ITEM_WOOD,Wood,목재
+ITEM_CLOTH,Cloth,천
+ITEM_PLASTIC,Plastic,플라스틱
+ITEM_CHEMICALS,Chemicals,화학품
+ITEM_FUEL,Fuel,연료
+ITEM_BATTERY,Battery,배터리
+ITEM_LEATHER,Leather,가죽
+ITEM_PARTS,Parts,부품
+ITEM_INGREDIENTS,Raw ingredients,식재료
+ITEM_SMALL_MEAT,Small meat,작은 고기
+ITEM_DIRTY_WATER,Dirty water,오염수
+ITEM_CANNED_FOOD,Canned food,통조림
+ITEM_BOTTLED_WATER,Bottled water,생수
+ITEM_CLEAN_WATER,Clean water,정수된 물
+ITEM_ROPE,Rope,끈
+ITEM_HEATED_CAN,Heated can,데운 통조림
+ITEM_VEGGIE_SOUP,Vegetable soup,채소 수프
+ITEM_RATION,Field ration,휴대 식량
+ITEM_HAMMER,Hammer,망치
+ITEM_CROWBAR,Crowbar,쇠지렛대
+ITEM_IRON_PIPE,Iron pipe,쇠파이프
+ITEM_HATCHET,Hatchet,손도끼
+ITEM_WATER_FILTER,Water filter,정수 필터
+ITEM_CANTEEN,Canteen,물통
+ITEM_SLEEPING_BAG,Sleeping bag,침낭
+ITEM_PONCHO,Rain poncho,방수 판초
+ITEM_WARM_COAT,Warm coat,방한 외투
+ITEM_PADDED_WORKWEAR,Padded workwear,덧댄 작업복
+ITEM_CLOTH_BAG,Cloth bag,천 가방
+ITEM_BANDAGE,Bandage,붕대
+ITEM_DISINFECTANT,Disinfectant,소독약
+ITEM_SPLINT,Splint,부목
+ITEM_CAN_LURE,Can lure,깡통 미끼
+FAC_WORKBENCH,Workbench,작업대
+FAC_RAIN_COLLECTOR,Rain collector,빗물 집수기
+FAC_STOVE,Stove,화덕
+FAC_BED,Bed,침상
+FAC_STORAGE_SHELF,Storage shelf,창고 선반
+FAC_BARRICADE,Barricade,바리케이드
+FAC_NAIL_BOARD,Nail boards,못 판자
+FAC_CAN_ALARM,Can alarm,깡통 경보기
+FAC_RAT_TRAP,Rat trap,쥐덫
+RECIPE_PURIFY_WATER,Purify water,물 정수
+RECIPE_BOIL_WATER,Boil rainwater,끓인 빗물
+LOC_CONVENIENCE_STORE,Convenience store,편의점
+LOC_CLOTHING_MALL,Clothing mall,의류 상가
+EV_HORDE,Horde ahead,감염체 무리
+EV_HORDE_LINE,A pack of them at the end of the hall. What do we do?,복도 끝에 놈들이 몰려 있어. 어떻게 할까?
+EV_CH_HORDE_HIDE,Hide and wait,숨어서 기다린다
+EV_CH_HORDE_BREAK,Break through,돌파한다
+EV_CH_HORDE_LURE,Throw a can lure,깡통 미끼로 유인한다
+EV_CACHE,Locked storeroom,숨은 창고
+EV_CACHE_LINE,There's a locked steel door. Something's inside.,잠긴 철문이 있어. 안에 뭔가 있는 것 같아.
+EV_CH_CACHE_SKIP,Move on,지나친다
+EV_CH_CACHE_CROWBAR,Pry it open,쇠지렛대로 연다
+EV_CH_CACHE_SMASH,Smash it loudly,소리를 내며 부순다
+EV_DOWNPOUR,Sudden downpour,날씨 급변
+EV_DOWNPOUR_LINE,It's pouring all of a sudden!,갑자기 쏟아지기 시작했어!
+EV_CH_DOWNPOUR_SHELTER,Take shelter,건물에 피신한다
+EV_CH_DOWNPOUR_PONCHO,Push on in ponchos,판초를 쓰고 강행한다
+EV_CH_DOWNPOUR_BARE,Push on anyway,맨몸으로 강행한다
+JOB_MECHANIC,Mechanic,정비공
+JOB_RUNNER,Runner,달리기 선수
+JOB_NURSE,Nurse,간호사
+NAME_DOYUN,Doyun,도윤
+NAME_HARIN,Harin,하린
+NAME_SEOYEON,Seoyeon,서연
+STAT_HEALTH,Health,건강
+STAT_FOOD,Food,포만
+STAT_WATER,Water,수분
+STAT_STAMINA,Stamina,기력
+WEATHER,Weather,날씨
+WEATHER_CLEAR,Clear,맑음
+WEATHER_RAIN,Rain,비
+MORALE,Morale,사기
+TRACE,Trace,흔적
+STOREROOM,Storeroom,창고
+FOOD_DAYS,food days,음식 일수
+WATER_DAYS,water days,물 일수
+SCORE,Score,점수
+ACT_REST,resting,쉬는 중
+ACT_SLEEP,sleeping,자는 중
+ACT_WORK,working,작업 중
+ACT_EXPEDITION,on expedition,원정 중
+LIFE_OK,ok,정상
+LIFE_COLLAPSED,collapsed,쓰러짐
+LIFE_DEAD,dead,사망
+LIFE_LEFT,left,떠남
+WARN_EXHAUSTED,{name} passed out from exhaustion,{name}이(가) 지쳐 쓰러져 잠들었다
+WARN_STARVING,{name} is starving,{name}이(가) 굶주리고 있다
+WARN_NO_FOOD,No food left in the storeroom,창고에 음식이 없다
+WARN_NO_WATER,No water left in the storeroom,창고에 물이 없다
+WARN_UPSET,{name} got sick from dirty water,{name}이(가) 오염수를 마시고 배탈이 났다
+WARN_COLLAPSED,{name} collapsed,{name}이(가) 쓰러졌다
+WARN_REVIVED,The nurse brought {name} back,간호사가 {name}을(를) 살려냈다
+WARN_SPOILED,Some raw food spoiled,날 음식 일부가 상했다
+WARN_LEFT,{name} left the base,{name}이(가) 거점을 떠났다
+CAUSE_STARVATION,starvation,굶주림·갈증
+RESULT_RESCUED,Rescued! The helicopter arrived,구조 성공! 헬기가 왔다
+RESULT_WIPED_OUT,Everyone is gone,전멸
+RESULT_BASE_COLLAPSED,The base fell apart,거점 붕괴

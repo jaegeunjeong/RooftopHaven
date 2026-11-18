@@ -8,8 +8,8 @@ script = ExtResource("1_main")
 [node name="Roof" type="ColorRect" parent="."]
 offset_left = 40.0
 offset_top = 40.0
-offset_right = 600.0
-offset_bottom = 340.0
+offset_right = 390.0
+offset_bottom = 344.0
 color = Color(0.33, 0.34, 0.32, 1)
 
 [node name="UI" type="CanvasLayer" parent="."]

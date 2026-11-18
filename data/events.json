@@ -1,0 +1,250 @@
+{
+	"rules": {
+		"start_day": 6,
+		"per_expedition_first": 1.0,
+		"per_expedition_second": 0.3,
+		"response_seconds": 5,
+		"response_seconds_with_radio": 10,
+		"team_bonus": {
+			"1": 0,
+			"2": 5,
+			"3": 10
+		},
+		"day_bonus": [
+			{
+				"from_day": 6,
+				"to_day": 10,
+				"bonus": 5
+			},
+			{
+				"from_day": 11,
+				"to_day": 15,
+				"bonus": 0
+			},
+			{
+				"from_day": 16,
+				"to_day": 20,
+				"bonus": -5
+			},
+			{
+				"from_day": 21,
+				"to_day": 30,
+				"bonus": -10
+			}
+		],
+		"low_health_penalty": {
+			"below": 30,
+			"bonus": -10
+		},
+		"fog": {
+			"hide": 10,
+			"flee": 10,
+			"fight": -10,
+			"search": -10
+		},
+		"clamp": [
+			35,
+			95
+		]
+	},
+	"list": [
+		{
+			"id": "horde",
+			"locations": "any",
+			"title": "EV_HORDE",
+			"line": "EV_HORDE_LINE",
+			"choices": [
+				{
+					"id": "horde_hide",
+					"text": "EV_CH_HORDE_HIDE",
+					"default": true,
+					"requires": null,
+					"base_chance": 0.85,
+					"tag": "hide",
+					"bonus": [],
+					"consume": null,
+					"success": {
+						"hours": 2
+					},
+					"fail": {
+						"light_injuries": 1,
+						"hours": 2
+					}
+				},
+				{
+					"id": "horde_break",
+					"text": "EV_CH_HORDE_BREAK",
+					"default": false,
+					"requires": null,
+					"base_chance": 0.55,
+					"tag": "fight",
+					"bonus": [
+						{
+							"item": "iron_pipe",
+							"bonus": 20
+						}
+					],
+					"consume": null,
+					"success": {
+						"loot_mult": 0.2
+					},
+					"fail": {
+						"serious_injuries": 1
+					}
+				},
+				{
+					"id": "horde_lure",
+					"text": "EV_CH_HORDE_LURE",
+					"default": false,
+					"requires": {
+						"item": "can_lure"
+					},
+					"base_chance": 0.8,
+					"tag": null,
+					"bonus": [],
+					"consume": {
+						"can_lure": 1
+					},
+					"success": {},
+					"fail": {
+						"hours": 1
+					}
+				}
+			]
+		},
+		{
+			"id": "cache",
+			"locations": "any",
+			"title": "EV_CACHE",
+			"line": "EV_CACHE_LINE",
+			"choices": [
+				{
+					"id": "cache_skip",
+					"text": "EV_CH_CACHE_SKIP",
+					"default": true,
+					"requires": null,
+					"base_chance": 1.0,
+					"tag": null,
+					"bonus": [],
+					"consume": null,
+					"success": {},
+					"fail": {}
+				},
+				{
+					"id": "cache_crowbar",
+					"text": "EV_CH_CACHE_CROWBAR",
+					"default": false,
+					"requires": {
+						"item": "crowbar"
+					},
+					"base_chance": 0.8,
+					"tag": null,
+					"bonus": [],
+					"consume": null,
+					"success": {
+						"extra_rare_rolls": 1
+					},
+					"fail": {
+						"hours": 1,
+						"durability": {
+							"crowbar": 2
+						}
+					}
+				},
+				{
+					"id": "cache_smash",
+					"text": "EV_CH_CACHE_SMASH",
+					"default": false,
+					"requires": null,
+					"base_chance": 0.65,
+					"tag": "search",
+					"bonus": [
+						{
+							"job": "mechanic",
+							"bonus": 15
+						}
+					],
+					"consume": null,
+					"success": {
+						"extra_rare_rolls": 1,
+						"trace": 2
+					},
+					"fail": {
+						"trace": 2,
+						"chain": {
+							"event": "horde",
+							"chance": 0.3
+						}
+					}
+				}
+			]
+		},
+		{
+			"id": "downpour",
+			"locations": "any",
+			"weather": [
+				"rain"
+			],
+			"title": "EV_DOWNPOUR",
+			"line": "EV_DOWNPOUR_LINE",
+			"choices": [
+				{
+					"id": "downpour_shelter",
+					"text": "EV_CH_DOWNPOUR_SHELTER",
+					"default": true,
+					"requires": null,
+					"base_chance": 1.0,
+					"tag": null,
+					"bonus": [],
+					"consume": null,
+					"success": {
+						"hours": 2
+					},
+					"fail": {}
+				},
+				{
+					"id": "downpour_poncho",
+					"text": "EV_CH_DOWNPOUR_PONCHO",
+					"default": false,
+					"requires": {
+						"item": "poncho"
+					},
+					"base_chance": 0.85,
+					"tag": null,
+					"bonus": [],
+					"consume": null,
+					"success": {
+						"durability": {
+							"poncho": 1
+						}
+					},
+					"fail": {
+						"break_item": "poncho",
+						"status": "wet"
+					}
+				},
+				{
+					"id": "downpour_bare",
+					"text": "EV_CH_DOWNPOUR_BARE",
+					"default": false,
+					"requires": null,
+					"base_chance": 0.45,
+					"tag": null,
+					"bonus": [
+						{
+							"job": "runner",
+							"bonus": 15
+						}
+					],
+					"consume": null,
+					"success": {},
+					"fail": {
+						"team_health": -15,
+						"status": "wet"
+					}
+				}
+			]
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

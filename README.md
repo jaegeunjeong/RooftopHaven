@@ -26,9 +26,13 @@
 ```
 src/
   autoload/game_clock.gd   실시간 게임 시계 (일시정지 없음, 배속 변수만 있음)
-  main/main.tscn, main.gd  시작 장면 (회색 박스 프로토타입)
+  autoload/game_data.gd    data/*.json을 읽고 서로 맞는지 검사 (GameData)
+  autoload/game_state.gd   한 판의 상태: 생존자, 창고, 사기, 흔적, 날씨, 승패 (GameState)
+  survivor/survivor.gd     생존자 한 명 (막대 4개와 상태)
+  main/main.tscn, main.gd  시작 장면 (회색 박스 프로토타입 화면)
+tests/                     헤드리스 검사 (tests/test_runner.tscn)
 assets/                    sprites, tiles, ui, fonts, audio (sfx, music)
-data/                      레시피·장소·사건 데이터 (예정)
+data/                      게임 숫자 전부 (재료, 시설, 레시피, 장소, 사건, 생존 수치, 밤, 점수)
 localization/              번역 CSV (keys, en, ko)
 docs/                      기술 메모
 ```
@@ -40,7 +44,41 @@ docs/                      기술 메모
 - 시간대: 아침 06–12, 낮 12–18, 저녁 18–21, 밤 21–06
 - 신호: `minute_changed`, `hour_changed`, `day_started`, `phase_changed`
 
-## 다음 할 일
+## 데이터 파일 (`data/`)
 
-- 1단계 수치 설계: 생존 수치, 레시피, 원정 장소 데이터를 `data/`에 정리
-- 2단계 회색 박스: 생존 수치 → 제작 5개 → 의뢰 1곳 → 무전 사건 3개 → 귀환 → 밤 습격
+게임 숫자는 코드에 쓰지 않고 모두 `data/*.json`에 둔다. 숫자를 바꾸려면 JSON만 고치고 다시 실행하면 된다. 설계 근거는 Obsidian `04-수치설계` 노트에 있다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `config.json` | 프로토타입 길이(10일), 시작 생존자·자원, 생존 수치 감소량, 자동 행동, 사기, 건설 시간 |
+| `items.json` | 재료, 음식, 물, 도구, 의류, 의료품 |
+| `facilities.json` | 초반 시설 9개 (작업대, 빗물 집수기, 화덕, 침상, 창고 선반, 바리케이드, 못 판자, 깡통 경보기, 쥐덫) |
+| `recipes.json` | 프로토타입 레시피 10개 + 보조 레시피 11개 |
+| `locations.json` | 원정 규칙과 장소 2곳 (편의점, 의류 상가) |
+| `events.json` | 무전 사건 규칙과 사건 3개 (감염체 무리, 숨은 창고, 날씨 급변) |
+| `jobs.json`, `injuries.json`, `night.json`, `weather.json`, `score.json` | 직업, 부상, 밤 습격과 흔적, 날씨, 점수 |
+
+실행할 때 `GameData`가 모든 파일을 읽고, 없는 아이템이나 시설을 가리키는 곳이 있으면 오류로 알려 준다.
+
+## 테스트 실행
+
+```
+godot --headless --path . res://tests/test_runner.tscn
+```
+
+데이터 로드, 이틀 진행, 굶주림과 간호사 살리기, 10일 구조까지 검사하고 `TESTS: PASS`를 출력한다.
+
+## 디버그 배속
+
+개발용 빌드에서만 숫자 키로 시간 속도를 바꿀 수 있다: `1` 보통, `2` 4배, `3` 16배, `4` 60배. 게임 자체에는 일시정지가 없다.
+
+## 진행 상황 (2단계 회색 박스)
+
+- [x] 1. 데이터 파일
+- [x] 2. 생존자와 수치 (막대 4개, 자동으로 먹고 마시고 자기, 쓰러짐과 간호사 살리기, 빗물, 음식 상함, 사기, 10일째 헬기)
+- [ ] 3. 거점 화면 (시설, 창고, 제작 패널, 짓기)
+- [ ] 4. 원정 (의뢰 게시판, 진행, 귀환 화면)
+- [ ] 5. 밤과 습격
+- [ ] 6. 무전 사건 3개
+- [ ] 7. 승리·패배·점수 화면
+- [ ] 8. 테스트 빌드

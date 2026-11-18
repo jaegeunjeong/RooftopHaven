@@ -1,0 +1,122 @@
+{
+	"rules": {
+		"bag_slots": 8,
+		"stack_in_bag": 5,
+		"team_loot": {
+			"1": 1.0,
+			"2": 1.8,
+			"3": 2.5
+		},
+		"team_injury": {
+			"1": 1.0,
+			"2": 0.8,
+			"3": 0.6
+		},
+		"depletion_per_visit": 0.2,
+		"depletion_floor": 0.3,
+		"regrow_per_day": 0.1,
+		"injury_split": {
+			"light": 0.8,
+			"serious": 0.2
+		},
+		"recall_return_ratio": 0.5,
+		"teams": {
+			"up_to_3_survivors": 1,
+			"from_4": 2,
+			"from_6_with_antenna": 3
+		}
+	},
+	"list": [
+		{
+			"id": "convenience_store",
+			"name": "LOC_CONVENIENCE_STORE",
+			"tier": "early",
+			"hours": 6,
+			"injury": 0.05,
+			"loot": {
+				"canned_food": [
+					2,
+					4
+				],
+				"bottled_water": [
+					1,
+					3
+				],
+				"ingredients": [
+					0,
+					2
+				],
+				"plastic": [
+					1,
+					2
+				]
+			},
+			"rare": [
+				{
+					"item": "fuel",
+					"count": 1,
+					"chance": 0.3
+				},
+				{
+					"item": "chemicals",
+					"count": 1,
+					"chance": 0.2
+				},
+				{
+					"item": "battery",
+					"count": 1,
+					"chance": 0.25
+				}
+			],
+			"requires": []
+		},
+		{
+			"id": "clothing_mall",
+			"name": "LOC_CLOTHING_MALL",
+			"tier": "early",
+			"hours": 8,
+			"injury": 0.08,
+			"loot": {
+				"cloth": [
+					3,
+					6
+				],
+				"plastic": [
+					1,
+					2
+				],
+				"wood": [
+					2,
+					3
+				],
+				"scrap": [
+					0,
+					1
+				]
+			},
+			"rare": [
+				{
+					"item": "rope",
+					"count": 1,
+					"chance": 0.3
+				},
+				{
+					"item": "warm_coat",
+					"count": 1,
+					"chance": 0.1
+				},
+				{
+					"item": "leather",
+					"count": [
+						1,
+						2
+					],
+					"chance": 0.25,
+					"from_day": 6
+				}
+			],
+			"requires": []
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

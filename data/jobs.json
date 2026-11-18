@@ -1,0 +1,36 @@
+{
+	"list": [
+		{
+			"id": "mechanic",
+			"name": "JOB_MECHANIC",
+			"build_time_mult": 0.75,
+			"repair_cost_mult": 0.5,
+			"expedition": {
+				"loot_add": {
+					"parts": 1
+				}
+			}
+		},
+		{
+			"id": "runner",
+			"name": "JOB_RUNNER",
+			"stamina_decay_mult": 0.8,
+			"expedition": {
+				"time_mult": 0.75,
+				"flee_bonus": 20
+			}
+		},
+		{
+			"id": "nurse",
+			"name": "JOB_NURSE",
+			"treat_mult": 1.5,
+			"revives_per_run": 1,
+			"revive_only_at_base": true,
+			"expedition": {
+				"team_injury_mult": 0.7,
+				"downgrade_serious_chance": 0.5
+			}
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

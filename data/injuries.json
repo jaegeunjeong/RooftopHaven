@@ -1,0 +1,35 @@
+{
+	"light": {
+		"work_mult": 0.9,
+		"heals_days": 3,
+		"infection_chance_per_day": 0.15,
+		"treatment": "bandage"
+	},
+	"serious": {
+		"work_mult": 0.5,
+		"no_expedition": true,
+		"health_per_hour": -0.5,
+		"first_aid": "splint",
+		"heals_days_with_splint": 5,
+		"infection_after_hours": 24,
+		"infection_chance": 0.5
+	},
+	"infected": {
+		"health_per_hour": -1,
+		"sleep_gain_mult": 0.5,
+		"cure": {
+			"disinfectant_days": 3
+		},
+		"collapse_after_days": 3
+	},
+	"cold": {
+		"sleep_gain_mult": 0.5,
+		"no_expedition": true,
+		"rest_days": 2
+	},
+	"upset": {
+		"extra_water_per_hour": 2,
+		"hours": 12
+	},
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

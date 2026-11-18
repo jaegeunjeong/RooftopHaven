@@ -1,0 +1,32 @@
+{
+	"per_day": 100,
+	"win": 3000,
+	"signal": 500,
+	"per_boarded": 500,
+	"per_joined": 200,
+	"per_death": -300,
+	"per_food_water": 5,
+	"per_material": 1,
+	"per_processed": 3,
+	"per_blueprint": 50,
+	"grades": [
+		[
+			"S",
+			12000
+		],
+		[
+			"A",
+			8000
+		],
+		[
+			"B",
+			4000
+		],
+		[
+			"C",
+			0
+		]
+	],
+	"prototype_note": "체험판·프로토타입(10일)은 같은 식에 날 수만 10일로 계산한다",
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

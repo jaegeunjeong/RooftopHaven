@@ -1,0 +1,101 @@
+{
+	"raid_check_hour": 22,
+	"infected": {
+		"chance_per_trace": 0.05,
+		"chance_max": 0.9,
+		"base_from_day": 6,
+		"base_chance": 0.15,
+		"rain_mult": 0.5,
+		"strength_by_day": [
+			[
+				1,
+				5,
+				2
+			],
+			[
+				6,
+				10,
+				4
+			],
+			[
+				11,
+				15,
+				5
+			],
+			[
+				16,
+				20,
+				8
+			],
+			[
+				21,
+				25,
+				11
+			],
+			[
+				26,
+				30,
+				13
+			]
+		],
+		"strength_per_5_trace": 1,
+		"final_night_bonus": 3
+	},
+	"defense": {
+		"guard_value": 1,
+		"guard_cap": 4,
+		"sleeping_guards_need_alarm": true
+	},
+	"outcomes": [
+		{
+			"min_margin": 2,
+			"result": "perfect",
+			"trace": -2
+		},
+		{
+			"min_margin": 0,
+			"result": "held",
+			"guard_light_injury": 0.3,
+			"defense_durability": -1
+		},
+		{
+			"min_margin": -2,
+			"result": "partial",
+			"guard_injury": 0.6,
+			"serious_share": 0.25,
+			"infected_break_facilities": 1
+		},
+		{
+			"min_margin": -99,
+			"result": "breach",
+			"serious_injuries": [
+				1,
+				2
+			],
+			"storage_loss": 0.25,
+			"break_facilities": [
+				1,
+				2
+			],
+			"morale": -10
+		}
+	],
+	"trace": {
+		"range": [
+			0,
+			20
+		],
+		"morning_decay": 3,
+		"rain_extra_decay": 2,
+		"sources": {
+			"fire_at_night": 1,
+			"build": 1,
+			"cooks_3_per_day": 1,
+			"rat_trap_per_day": 1,
+			"rotten_food_per_day": 1,
+			"night_return": 1,
+			"smash_choice": 2
+		}
+	},
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}

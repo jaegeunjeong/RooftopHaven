@@ -1,0 +1,282 @@
+{
+	"list": [
+		{
+			"id": "hammer",
+			"output": {
+				"hammer": 1
+			},
+			"inputs": {
+				"scrap": 2,
+				"wood": 1
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"prototype": true,
+			"name": "ITEM_HAMMER"
+		},
+		{
+			"id": "crowbar",
+			"output": {
+				"crowbar": 1
+			},
+			"inputs": {
+				"scrap": 3
+			},
+			"station": "workbench",
+			"minutes": 45,
+			"prototype": true,
+			"name": "ITEM_CROWBAR"
+		},
+		{
+			"id": "water_filter",
+			"output": {
+				"water_filter": 1
+			},
+			"inputs": {
+				"plastic": 2,
+				"cloth": 1
+			},
+			"station": "workbench",
+			"minutes": 60,
+			"prototype": true,
+			"name": "ITEM_WATER_FILTER"
+		},
+		{
+			"id": "sleeping_bag",
+			"output": {
+				"sleeping_bag": 1
+			},
+			"inputs": {
+				"cloth": 4,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 90,
+			"prototype": true,
+			"name": "ITEM_SLEEPING_BAG"
+		},
+		{
+			"id": "heated_can",
+			"output": {
+				"heated_can": 1
+			},
+			"inputs": {
+				"canned_food": 1
+			},
+			"station": "stove",
+			"minutes": 15,
+			"fuel": 1,
+			"prototype": true,
+			"name": "ITEM_HEATED_CAN"
+		},
+		{
+			"id": "veggie_soup",
+			"output": {
+				"veggie_soup": 1
+			},
+			"inputs": {
+				"ingredients": 2,
+				"clean_water": 1
+			},
+			"station": "stove",
+			"minutes": 30,
+			"prototype": true,
+			"name": "ITEM_VEGGIE_SOUP"
+		},
+		{
+			"id": "poncho",
+			"output": {
+				"poncho": 1
+			},
+			"inputs": {
+				"plastic": 3,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 45,
+			"prototype": true,
+			"name": "ITEM_PONCHO"
+		},
+		{
+			"id": "warm_coat",
+			"output": {
+				"warm_coat": 1
+			},
+			"inputs": {
+				"cloth": 5,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 120,
+			"prototype": true,
+			"name": "ITEM_WARM_COAT"
+		},
+		{
+			"id": "bandage",
+			"output": {
+				"bandage": 1
+			},
+			"inputs": {
+				"cloth": 2
+			},
+			"station": "workbench",
+			"minutes": 15,
+			"prototype": true,
+			"name": "ITEM_BANDAGE"
+		},
+		{
+			"id": "disinfectant",
+			"output": {
+				"disinfectant": 1
+			},
+			"inputs": {
+				"chemicals": 1,
+				"clean_water": 1
+			},
+			"station": "stove",
+			"minutes": 60,
+			"prototype": true,
+			"name": "ITEM_DISINFECTANT"
+		},
+		{
+			"id": "rope",
+			"output": {
+				"rope": 1
+			},
+			"inputs": {
+				"cloth": 2
+			},
+			"station": "workbench",
+			"minutes": 15,
+			"name": "ITEM_ROPE"
+		},
+		{
+			"id": "purify_water",
+			"output": {
+				"clean_water": 1
+			},
+			"inputs": {
+				"dirty_water": 1
+			},
+			"station": "workbench",
+			"minutes": 5,
+			"uses_durability": "water_filter",
+			"name": "RECIPE_PURIFY_WATER"
+		},
+		{
+			"id": "boil_water",
+			"output": {
+				"clean_water": 1
+			},
+			"inputs": {
+				"dirty_water": 1
+			},
+			"station": "stove",
+			"minutes": 60,
+			"fuel": 1,
+			"name": "RECIPE_BOIL_WATER"
+		},
+		{
+			"id": "splint",
+			"output": {
+				"splint": 1
+			},
+			"inputs": {
+				"wood": 1,
+				"cloth": 1
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"name": "ITEM_SPLINT"
+		},
+		{
+			"id": "iron_pipe",
+			"output": {
+				"iron_pipe": 1
+			},
+			"inputs": {
+				"scrap": 2
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"name": "ITEM_IRON_PIPE"
+		},
+		{
+			"id": "hatchet",
+			"output": {
+				"hatchet": 1
+			},
+			"inputs": {
+				"scrap": 2,
+				"wood": 1
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"name": "ITEM_HATCHET"
+		},
+		{
+			"id": "canteen",
+			"output": {
+				"canteen": 1
+			},
+			"inputs": {
+				"plastic": 2
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"name": "ITEM_CANTEEN"
+		},
+		{
+			"id": "padded_workwear",
+			"output": {
+				"padded_workwear": 1
+			},
+			"inputs": {
+				"cloth": 3,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 60,
+			"name": "ITEM_PADDED_WORKWEAR"
+		},
+		{
+			"id": "cloth_bag",
+			"output": {
+				"cloth_bag": 1
+			},
+			"inputs": {
+				"cloth": 3,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 45,
+			"name": "ITEM_CLOTH_BAG"
+		},
+		{
+			"id": "ration",
+			"output": {
+				"ration": 1
+			},
+			"inputs": {
+				"canned_food": 1
+			},
+			"station": "stove",
+			"minutes": 15,
+			"name": "ITEM_RATION"
+		},
+		{
+			"id": "can_lure",
+			"output": {
+				"can_lure": 1
+			},
+			"inputs": {
+				"scrap": 1,
+				"rope": 1
+			},
+			"station": "workbench",
+			"minutes": 30,
+			"name": "ITEM_CAN_LURE"
+		}
+	],
+	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
+}
