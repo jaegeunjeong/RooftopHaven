@@ -139,3 +139,66 @@ WARN_ACCIDENT,{name} got hurt while working,{name}이(가) 작업하다 다쳤�
 INJ_LIGHT,light injury,경상
 INJ_SERIOUS,serious injury,중상
 INJ_INFECTED,infected,감염
+TAB_EXPEDITION,Expedition,원정
+WARN_EXP_LEFT,The team left for {place},원정대가 {place}(으)로 떠났다
+WARN_EXP_BACK,The team is back from {place},원정대가 {place}에서 돌아왔다
+WARN_EXP_RECALLED,The team is heading back from {place},원정대가 {place}에서 돌아오기 시작했다
+WARN_EXP_CARRY,Someone collapsed at {place}; the team is carrying them home,{place}에서 한 명이 쓰러져 업고 돌아온다
+WARN_INJ_LIGHT,{name} got a light injury,{name}이(가) 가볍게 다쳤다
+WARN_INJ_SERIOUS,{name} is seriously hurt,{name}이(가) 크게 다쳤다
+WARN_INJ_INFECTED,{name}'s wound is infected,{name}의 상처가 감염됐다
+WARN_TREATED,{name} was treated with {item},{name}에게 {item}을(를) 썼다
+WARN_CURED,{name} recovered from the infection,{name}의 감염이 나았다
+WARN_RAID_PERFECT,The infected came at night. Held them off without a scratch,밤에 감염체가 왔다. 완벽하게 막아냈다
+WARN_RAID_HELD,The infected came at night. We held,밤에 감염체가 왔다. 겨우 막아냈다
+WARN_RAID_PARTIAL,The infected broke in partly,감염체가 일부 뚫고 들어왔다
+WARN_RAID_BREACH,The infected overran the base,감염체가 거점을 크게 뚫었다
+WARN_FAC_BROKEN,{item} was destroyed,{item}이(가) 부서졌다
+CAUSE_INJURY,injury,부상
+CAUSE_INFECTION,infection,감염
+REASON_NOT_ACTIVE,Can't go,갈 수 없음
+REASON_AWAY,Already out,이미 나가 있음
+REASON_TOO_HURT,Too hurt to go,다쳐서 못 감
+REASON_TOO_WEAK,Health too low,건강이 너무 낮음
+REASON_TOO_TIRED,Too tired,너무 지침
+REASON_TEAM_LIMIT,Another team is already out (4+ survivors allow 2 teams),이미 나간 원정대가 있음 (4명 이상이면 2팀)
+REASON_PICK_TEAM,Pick who goes,갈 사람을 고르세요
+REASON_TEAM_TOO_BIG,3 people at most,최대 3명
+REASON_KEEP_ONE,Someone must stay at the base,한 명은 거점에 남아야 함
+EXP_PLACE,Where,어디로
+EXP_TEAM,Who goes,누가
+EXP_GEAR,Takes,챙길 것
+EXP_GO,Send team,출발
+EXP_RECALL,Call back,귀환 지시
+EXP_NONE_OUT,No team is out.,나가 있는 원정대가 없습니다.
+EXP_INFO,{hours} trip (real {real}) · injury {inj}% each · back at {back},{hours} (실제 {real}) · 1인 부상 {inj}% · {back} 귀환
+EXP_LOOT,Finds,수확
+EXP_STOCK,left {p}%,남은 양 {p}%
+EXP_OUT,Out,나가 있음
+EXP_ETA,{left} left,{left} 남음
+EXP_RETURNING,coming back,돌아오는 중
+NIGHT,Tonight,오늘 밤
+NIGHT_WATCH,On watch,경비
+NIGHT_INFO,Infected chance {p}% · strength {st} vs defense {d},감염체 올 확률 {p}% · 강도 {st} vs 방어력 {d}
+NIGHT_ALARM,Can alarm: everyone at the base wakes up to fight,깡통 경보기: 거점의 모두가 깨어 싸움
+NIGHT_NO_ALARM,No alarm: only people on watch fight (they stay up until 04:00),경보기 없음: 경비를 선 사람만 싸움 (04시까지 깨어 있음)
+REPORT_OK,OK,확인
+REPORT_EXP_TITLE,Back from {place},{place}에서 귀환
+REPORT_RECALLED,(called back early),(일찍 귀환)
+REPORT_LOOT,Brought back,가져온 것
+REPORT_NOTHING,nothing,없음
+REPORT_INJURIES,Injuries,부상
+REPORT_NO_INJURY,nobody got hurt,다친 사람 없음
+REPORT_PATCHED,patched with a bandage,붕대로 응급처치
+REPORT_TRACE,Came back after dark: trace +1,밤에 돌아옴: 흔적 +1
+REPORT_RAID_TITLE,Night raid,밤 습격
+REPORT_RAID_LINE,Strength {st} vs defense {d} ({g} guards),강도 {st} vs 방어력 {d} (경비 {g}명)
+RAID_PERFECT,Perfect defense,완벽 방어
+RAID_HELD,Held,막아냄
+RAID_PARTIAL,Partly broken in,일부 뚫림
+RAID_BREACH,Overrun,크게 뚫림
+REPORT_BROKEN,Destroyed,부서진 것
+REPORT_LOST,Lost from the storeroom,창고에서 잃은 것
+HM_M,{m}m,{m}분
+HM_H,{h}h,{h}시간
+HM_HM,{h}h {m}m,{h}시간 {m}분

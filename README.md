@@ -29,6 +29,8 @@ src/
   autoload/game_data.gd    data/*.json을 읽고 서로 맞는지 검사 (GameData)
   autoload/game_state.gd   한 판의 상태: 생존자, 창고, 사기, 흔적, 날씨, 승패 (GameState)
   survivor/survivor.gd     생존자 한 명 (막대 4개와 상태)
+  expedition/expeditions.gd 원정: 팀·장비, 진행, 귀환 지시, 수확·부상 판정
+  night/raids.gd           밤 습격: 흔적에 따른 확률, 경비, 방어력 비교, 결과
   main/main.tscn, main.gd  시작 장면 (회색 박스 프로토타입 화면)
 tests/                     헤드리스 검사 (tests/test_runner.tscn)
 assets/                    sprites, tiles, ui, fonts, audio (sfx, music)
@@ -66,7 +68,7 @@ docs/                      기술 메모
 godot --headless --path . res://tests/test_runner.tscn
 ```
 
-데이터 로드, 이틀 진행, 굶주림과 간호사 살리기, 10일 구조까지 검사하고 `TESTS: PASS`를 출력한다.
+데이터, 생존 수치, 짓기·제작, 원정, 부상, 밤 습격을 검사하고, 간단한 자동 플레이어로 10일 판을 20번 돌린 뒤 `TESTS: PASS`를 출력한다.
 
 ## 디버그 배속
 
@@ -77,8 +79,8 @@ godot --headless --path . res://tests/test_runner.tscn
 - [x] 1. 데이터 파일
 - [x] 2. 생존자와 수치 (막대 4개, 자동으로 먹고 마시고 자기, 쓰러짐과 간호사 살리기, 빗물, 음식 상함, 사기, 10일째 헬기)
 - [x] 3. 거점 화면 (거점·짓기·제작·작업 탭, 작업 대기열, 재료·도구·시설 조건, 건설 시간, 내구도, 창고 칸)
-- [ ] 4. 원정 (의뢰 게시판, 진행, 귀환 화면)
-- [ ] 5. 밤과 습격
+- [x] 4. 원정 (원정 탭: 장소·팀 고르기, 장비 자동 챙기기, 실시간 수치, 귀환 지시, 귀환 보고 창)
+- [x] 5. 밤과 습격 (경비 세우기, 22시 판정, 방어력 vs 강도, 결과표, 방어 시설 내구도, 마지막 밤)
 - [ ] 6. 무전 사건 3개
 - [ ] 7. 승리·패배·점수 화면
 - [ ] 8. 테스트 빌드

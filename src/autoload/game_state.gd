@@ -1,9 +1,9 @@
 extends Node
 ## State of the current run (autoload: GameState).
-## Step 2 of the grey-box prototype: survivors, their four bars, automatic
-## eating / drinking / sleeping, the storeroom, daily rain water, food spoilage,
-## base morale, and the win / lose checks. Building, expeditions and raids come
-## in later steps and plug into the same tick.
+## Survivors and their four bars, automatic eating / drinking / sleeping,
+## injuries, the storeroom, the work queue, daily rain water, food spoilage,
+## base morale and the win / lose checks. Expeditions (Expeditions) and night
+## raids (Raids) are helper objects that run on the same one-minute tick.
 
 signal survivors_changed
 signal inventory_changed
@@ -13,6 +13,9 @@ signal survivor_died(survivor: Survivor)
 signal run_ended(result: StringName, score: int)
 signal queue_changed
 signal built_changed
+signal expedition_returned(report: Dictionary)
+signal raid_resolved(report: Dictionary)
+signal night_changed
 
 const MIN_PER_HOUR := 60.0
 
@@ -35,8 +38,19 @@ var joined: int = 0
 var ended: bool = false
 var result: StringName = &""
 
+var expeditions: Expeditions
+var raids: Raids
+
 var _rng := RandomNumberGenerator.new()
 var _warned: Dictionary = {}
+
+
+func _init() -> void:
+	expeditions = Expeditions.new(self)
+	raids = Raids.new(self)
+	expeditions.returned.connect(func(r: Dictionary) -> void: expedition_returned.emit(r))
+	raids.resolved.connect(func(r: Dictionary) -> void: raid_resolved.emit(r))
+	raids.changed.connect(func() -> void: night_changed.emit())
 
 
 func _ready() -> void:
@@ -85,6 +99,8 @@ func new_run(seed_value: int = 0) -> void:
 	ended = false
 	result = &""
 	_warned.clear()
+	expeditions.reset()
+	raids.reset()
 	_make_weather()
 	survivors_changed.emit()
 	inventory_changed.emit()
@@ -408,6 +424,7 @@ func _finish_task(t: Dictionary) -> void:
 	if t["kind"] == "build":
 		var fid: String = t["id"]
 		built[fid] = int(built.get(fid, 0)) + 1
+		raids.on_built(fid)
 		for req: String in GameData.facility(fid).get("requires", []):
 			if GameData.items.has(req):
 				wear(req)
@@ -477,6 +494,8 @@ func advance_minute() -> void:
 			pass  # set by the expedition step
 		elif not task_of(s).is_empty():
 			s.activity = Survivor.Activity.WORK
+		elif s.guard and _on_watch(hour) and s.stamina > 5.0:
+			s.activity = Survivor.Activity.REST  # night watch: stays up
 		elif sleep_time or (s.activity == Survivor.Activity.SLEEP and s.stamina < 80.0) \
 				or s.stamina < float(auto["sleep_if_stamina_below"]):
 			s.activity = Survivor.Activity.SLEEP
@@ -489,6 +508,9 @@ func advance_minute() -> void:
 		var stamina_loss := float(decay["stamina"][key]) / MIN_PER_HOUR
 		if s.job == "runner":
 			stamina_loss *= float(GameData.job("runner").get("stamina_decay_mult", 1.0))
+		if s.activity == Survivor.Activity.EXPEDITION:
+			water_loss *= expeditions.water_decay_mult(s)
+			stamina_loss *= expeditions.stamina_decay_mult(s)
 		if s.upset_minutes > 0:
 			water_loss += float(GameData.injuries["upset"]["extra_water_per_hour"]) / MIN_PER_HOUR
 			s.upset_minutes -= 1
@@ -500,6 +522,8 @@ func advance_minute() -> void:
 			if spot < beds.size():
 				gain = beds[spot]
 			spot += 1
+			if s.injury == "infected":
+				gain *= float(GameData.injuries["infected"]["sleep_gain_mult"])
 			s.stamina = min(100.0, s.stamina + gain / MIN_PER_HOUR)
 		elif s.stamina <= 0.0:
 			# passed out from exhaustion
@@ -528,10 +552,13 @@ func advance_minute() -> void:
 			var resting := s.activity == Survivor.Activity.REST or s.activity == Survivor.Activity.SLEEP
 			if resting and s.injury == "" and s.food >= float(heal["needs_food"]) and s.water >= float(heal["needs_water"]):
 				s.health = min(100.0, s.health + float(heal["per_hour"]) / MIN_PER_HOUR)
+		_tick_injury(s)
 		if s.health <= 0.0:
 			s.health = 0.0
 			_collapse(s)
 	_progress_work()
+	expeditions.tick()
+	raids.tick()
 	_tick_morale()
 	_check_end()
 	survivors_changed.emit()
@@ -589,6 +616,111 @@ func _drink(s: Survivor) -> void:
 			_warn("WARN_UPSET", s)
 		return
 	_warn("WARN_NO_WATER", null)
+
+
+# ------------------------------------------------------------------ injuries
+
+## Give a survivor an injury (a worse one replaces a lighter one).
+func injure(s: Survivor, kind: String) -> void:
+	if not s.is_alive():
+		return
+	var order := {"": 0, "light": 1, "serious": 2, "infected": 3}
+	change_morale(float(GameData.config["morale"]["daily"]["injury"]))
+	if s.injury != "" and int(order.get(kind, 0)) <= int(order.get(s.injury, 0)):
+		if s.injury == "light" and kind == "light":
+			kind = "serious"  # hurt again on top of a light injury
+		else:
+			return
+	s.injury = kind
+	s.injury_minutes = 0
+	s.splinted = false
+	s.disinfect_doses = 0
+	_warn("WARN_INJ_" + kind.to_upper(), s)
+	_treat(s)
+
+
+func _nurse_at_base() -> bool:
+	for n in survivors:
+		if n.job == "nurse" and n.is_active() and n.at_base:
+			return true
+	return false
+
+
+## Use bandages / splints / disinfectant from the storeroom automatically.
+func _treat(s: Survivor) -> void:
+	if not s.at_base or not s.is_alive():
+		return
+	var heal_mult := float(GameData.job("nurse").get("treat_mult", 1.0)) if _nurse_at_base() else 1.0
+	match s.injury:
+		"light":
+			if take_item("bandage"):
+				s.injury = ""
+				s.health = min(100.0, s.health + float(GameData.item("bandage").get("health", 15)) * heal_mult)
+				_warn("WARN_TREATED", s, {"item": GameData.display_name(GameData.item("bandage"))})
+		"serious":
+			if not s.splinted and take_item("splint"):
+				s.splinted = true
+				_warn("WARN_TREATED", s, {"item": GameData.display_name(GameData.item("splint"))})
+		"infected":
+			if s.last_dose_day != GameClock.day and take_item("disinfectant"):
+				s.last_dose_day = GameClock.day
+				s.disinfect_doses += 1
+				_warn("WARN_TREATED", s, {"item": GameData.display_name(GameData.item("disinfectant"))})
+				if s.disinfect_doses >= int(GameData.injuries["infected"]["cure"]["disinfectant_days"]):
+					s.injury = ""
+					_warn("WARN_CURED", s)
+
+
+func _tick_injury(s: Survivor) -> void:
+	if s.injury == "":
+		return
+	s.injury_minutes += 1
+	var inj: Dictionary = GameData.injuries
+	if s.injury_minutes % 60 == 0:
+		_treat(s)
+		if s.injury == "":
+			return
+	match s.injury:
+		"light":
+			var l: Dictionary = inj["light"]
+			if s.injury_minutes % 1440 == 0 and _rng.randf() < float(l["infection_chance_per_day"]):
+				_set_infected(s)
+			elif s.injury_minutes >= int(float(l["heals_days"]) * 1440.0):
+				s.injury = ""
+		"serious":
+			var r: Dictionary = inj["serious"]
+			if s.splinted:
+				if s.injury_minutes >= int(float(r["heals_days_with_splint"]) * 1440.0):
+					s.injury = ""
+			else:
+				s.health += float(r["health_per_hour"]) / MIN_PER_HOUR
+				s.cause_of_death = "CAUSE_INJURY"
+				if s.injury_minutes == int(float(r["infection_after_hours"]) * MIN_PER_HOUR) and _rng.randf() < float(r["infection_chance"]):
+					_set_infected(s)
+		"infected":
+			var f: Dictionary = inj["infected"]
+			s.health += float(f["health_per_hour"]) / MIN_PER_HOUR
+			s.cause_of_death = "CAUSE_INFECTION"
+			if s.disinfect_doses == 0 and s.injury_minutes >= int(float(f["collapse_after_days"]) * 1440.0):
+				s.health = 0.0
+
+
+func _set_infected(s: Survivor) -> void:
+	s.injury = "infected"
+	s.injury_minutes = 0
+	s.disinfect_doses = 0
+	_warn("WARN_INJ_INFECTED", s)
+	_treat(s)
+
+
+## Night watch hours (22:00-04:00).
+func _on_watch(hour: int) -> bool:
+	return hour >= int(GameData.config["auto"]["sleep_from_hour"]) or hour < 4
+
+
+func set_guard(s: Survivor, on: bool) -> void:
+	s.guard = on and s.is_active()
+	night_changed.emit()
 
 
 # ------------------------------------------------------------------ collapse & death
@@ -677,6 +809,7 @@ func morning() -> void:
 	if spoiled > 0:
 		_warn("WARN_SPOILED", null)
 	cooks_today = 0
+	expeditions.morning()
 	# morale from yesterday's meals
 	var md: Dictionary = cfg["morale"]["daily"]
 	if foods_today.size() >= 2:
@@ -772,6 +905,10 @@ func _make_weather() -> void:
 		for i in _rng.randi_range(int(block[0]), int(block[1])):
 			weather_by_day[day] = w
 			day += 1
+
+
+func warn(key: String, s: Survivor, extra: Dictionary = {}) -> void:
+	_warn(key, s, extra)
 
 
 ## Warnings fire once per survivor per in-game hour so the log stays readable.

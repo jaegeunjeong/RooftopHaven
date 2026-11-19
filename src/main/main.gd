@@ -1,7 +1,8 @@
 extends Node2D
 ## Entry scene for the grey-box prototype (stage 2).
-## Left: base tabs (base view, build, craft, work queue). Right: survivor
-## cards and a short warning log. Plain boxes and text on purpose.
+## Left: base tabs (base view + night watch, build, craft, expedition, work
+## queue). Right: survivor cards and a short warning log. Reports for returning
+## teams and night raids pop up in the middle. Plain boxes and text on purpose.
 
 const FONT_SIZE := 10
 const BAR_COLORS := {
@@ -37,6 +38,15 @@ var _build_list: VBoxContainer
 var _craft_list: VBoxContainer
 var _work_list: VBoxContainer
 var _work_bars: Array[ProgressBar] = []
+var _exp_list: VBoxContainer
+var _exp_bars: Dictionary = {}       # expedition id -> [ProgressBar, Label]
+var _exp_place: String = "convenience_store"
+var _exp_team: Dictionary = {}       # survivor id -> picked
+var _night_box: VBoxContainer
+var _night_info: Label
+var _popup: PanelContainer
+var _popup_label: Label
+var _reports: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -57,6 +67,10 @@ func _ready() -> void:
 	GameState.morale_changed.connect(func(_v: float) -> void: _refresh_status())
 	GameState.warning.connect(_on_warning)
 	GameState.run_ended.connect(_on_run_ended)
+	GameState.expedition_returned.connect(_on_report)
+	GameState.raid_resolved.connect(_on_report)
+	GameState.night_changed.connect(_refresh_night)
+	GameState.expeditions.changed.connect(_update_exp_progress)
 	_on_minute_changed(GameClock.day, GameClock.hour, GameClock.minute)
 	_on_phase_changed(GameClock.phase)
 	_refresh_survivors()
@@ -90,6 +104,7 @@ func _build_ui() -> void:
 	_tabs.add_child(_make_base_tab())
 	_build_list = _make_list_tab("TAB_BUILD")
 	_craft_list = _make_list_tab("TAB_CRAFT")
+	_exp_list = _make_list_tab("TAB_EXPEDITION")
 	_work_list = _make_list_tab("TAB_WORK")
 	_tabs.set_tab_title(0, tr("TAB_BASE"))
 
@@ -138,6 +153,30 @@ func _build_ui() -> void:
 	_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_log.clip_text = true
 
+	_popup = PanelContainer.new()
+	_popup.theme = _theme
+	_popup.position = Vector2(110, 70)
+	_popup.custom_minimum_size = Vector2(300, 0)
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.10, 0.11, 0.12, 0.97)
+	ps.border_color = Color(0.85, 0.75, 0.40)
+	ps.set_border_width_all(1)
+	ps.set_content_margin_all(8)
+	_popup.add_theme_stylebox_override("panel", ps)
+	_popup.z_index = 20
+	var pv := VBoxContainer.new()
+	_popup.add_child(pv)
+	_popup_label = Label.new()
+	_popup_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_popup_label.custom_minimum_size = Vector2(284, 0)
+	pv.add_child(_popup_label)
+	var ok := Button.new()
+	ok.text = tr("REPORT_OK")
+	ok.pressed.connect(_close_report)
+	pv.add_child(ok)
+	_popup.visible = false
+	ui.add_child(_popup)
+
 
 func _make_base_tab() -> Control:
 	var v := VBoxContainer.new()
@@ -153,6 +192,9 @@ func _make_base_tab() -> Control:
 	_stock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_stock.custom_minimum_size = Vector2(370, 0)
 	v.add_child(_stock)
+	_night_box = VBoxContainer.new()
+	_night_box.add_theme_constant_override("separation", 1)
+	v.add_child(_night_box)
 	return v
 
 
@@ -184,6 +226,7 @@ func _on_minute_changed(day: int, hour: int, minute: int) -> void:
 	clock_label.text = "%s %d  %02d:%02d" % [tr("DAY"), day, hour, minute]
 	if minute % 10 == 0:
 		_refresh_status()
+		_refresh_night_info()
 	_refresh_work_bars()
 
 
@@ -210,6 +253,12 @@ func _refresh_survivors() -> void:
 		var task := GameState.task_of(s)
 		if not task.is_empty():
 			state = GameState.task_name(task)
+		if s.expedition_id != 0:
+			for e: Dictionary in GameState.expeditions.active:
+				if int(e["id"]) == s.expedition_id:
+					state = "%s · %s" % [tr("ACT_EXPEDITION"), GameData.display_name(GameData.locations[e["location"]])]
+		elif s.guard and (GameClock.hour >= 22 or GameClock.hour < 4) and s.activity == Survivor.Activity.REST:
+			state = tr("NIGHT_WATCH")
 		if s.life != Survivor.Life.OK:
 			state = tr("LIFE_" + Survivor.Life.keys()[s.life])
 		if s.injury != "":
@@ -226,7 +275,9 @@ func _refresh_lists() -> void:
 	_refresh_base()
 	_refresh_build()
 	_refresh_craft()
+	_refresh_expedition()
 	_refresh_work()
+	_refresh_night()
 
 
 func _refresh_base() -> void:
@@ -344,7 +395,7 @@ func _refresh_work() -> void:
 		cancel.text = tr("CANCEL")
 		cancel.pressed.connect(func() -> void: GameState.cancel_task(i))
 		row.add_child(cancel)
-	_tabs.set_tab_title(3, "%s (%d)" % [tr("TAB_WORK"), GameState.tasks.size()])
+	_tabs.set_tab_title(4, "%s (%d)" % [tr("TAB_WORK"), GameState.tasks.size()])
 
 
 func _refresh_work_bars() -> void:
@@ -423,3 +474,262 @@ func _on_warning(text: String) -> void:
 
 func _on_run_ended(r: StringName, score_value: int) -> void:
 	_end_label.text = "%s\n%s %d (%s)" % [tr("RESULT_" + String(r).to_upper()), tr("SCORE"), score_value, GameState.grade(score_value)]
+
+
+# ------------------------------------------------------------------ expedition tab
+
+func _refresh_expedition() -> void:
+	for c in _exp_list.get_children():
+		c.queue_free()
+	_exp_bars.clear()
+	var X: Expeditions = GameState.expeditions
+	_section(_exp_list, tr("EXP_OUT"))
+	if X.active.is_empty():
+		_muted(_exp_list, tr("EXP_NONE_OUT"))
+	for e: Dictionary in X.active:
+		var row := HBoxContainer.new()
+		_exp_list.add_child(row)
+		var names: PackedStringArray = []
+		for m in X.members_of(e):
+			names.append(tr(m.name_key))
+		var l := Label.new()
+		l.text = "%s · %s" % [GameData.display_name(GameData.locations[e["location"]]), ", ".join(names)]
+		l.custom_minimum_size = Vector2(120, 0)
+		l.clip_text = true
+		row.add_child(l)
+		var bar := ProgressBar.new()
+		bar.max_value = 1.0
+		bar.step = 0.001
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(90, 7)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color(0.40, 0.65, 0.80)
+		bar.add_theme_stylebox_override("fill", fill)
+		row.add_child(bar)
+		var eta := Label.new()
+		eta.custom_minimum_size = Vector2(70, 0)
+		row.add_child(eta)
+		var b := Button.new()
+		b.text = tr("EXP_RECALL")
+		b.disabled = bool(e["recalled"])
+		var eid := int(e["id"])
+		b.pressed.connect(func() -> void:
+			GameState.expeditions.recall(eid)
+			_refresh_expedition())
+		row.add_child(b)
+		_exp_bars[eid] = [bar, eta]
+	_update_exp_progress()
+
+	_section(_exp_list, tr("EXP_PLACE"))
+	var picked: Array[Survivor] = []
+	for s in GameState.survivors:
+		if _exp_team.get(s.id, false) and X.member_blocker(s) == "":
+			picked.append(s)
+	for lid: String in GameData.locations:
+		var loc: Dictionary = GameData.locations[lid]
+		var row := HBoxContainer.new()
+		_exp_list.add_child(row)
+		var b := Button.new()
+		b.text = ("▶ " if lid == _exp_place else "   ") + GameData.display_name(loc)
+		b.custom_minimum_size = Vector2(96, 0)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func() -> void:
+			_exp_place = lid
+			_refresh_expedition())
+		row.add_child(b)
+		var team: Array = picked if not picked.is_empty() else [GameState.survivors[1]]
+		var mins := X.trip_minutes(lid, team)
+		var inj := X.injury_chance(lid, team, X.pick_gear(team)) * 100.0
+		var back_min := GameClock.hour * 60 + GameClock.minute + int(mins)
+		var info := Label.new()
+		var loot: PackedStringArray = []
+		for id: String in loc["loot"]:
+			var r: Array = loc["loot"][id]
+			loot.append("%s %d~%d" % [_thing_name(id), int(r[0]), int(r[1])])
+		info.text = "%s\n%s: %s · %s" % [
+				tr("EXP_INFO").format({"hours": _hm(mins), "real": _real_time(mins), "inj": int(round(inj)),
+						"back": "%02d:%02d" % [(back_min / 60) % 24, back_min % 60]}),
+				tr("EXP_LOOT"), ", ".join(loot), tr("EXP_STOCK").format({"p": int(round(X.stock_of(lid) * 100))})]
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.custom_minimum_size = Vector2(260, 0)
+		info.add_theme_color_override("font_color", MUTED)
+		row.add_child(info)
+
+	_section(_exp_list, tr("EXP_TEAM"))
+	var team_row := HBoxContainer.new()
+	_exp_list.add_child(team_row)
+	for s in GameState.survivors:
+		var cb := CheckBox.new()
+		var blocker := X.member_blocker(s)
+		cb.text = tr(s.name_key) + ("" if blocker == "" else " (" + tr(blocker) + ")")
+		cb.disabled = blocker != ""
+		cb.button_pressed = _exp_team.get(s.id, false) and blocker == ""
+		var sid := s.id
+		cb.toggled.connect(func(on: bool) -> void:
+			_exp_team[sid] = on
+			_refresh_expedition())
+		team_row.add_child(cb)
+
+	var ids: Array = []
+	for s in picked:
+		ids.append(s.id)
+	var gear := X.pick_gear(picked)
+	var gear_text: PackedStringArray = []
+	for id: String in gear:
+		gear_text.append("%s %d" % [_thing_name(id), int(gear[id])])
+	_muted(_exp_list, "%s: %s" % [tr("EXP_GEAR"), ", ".join(gear_text) if not gear_text.is_empty() else "-"])
+	var go_row := HBoxContainer.new()
+	_exp_list.add_child(go_row)
+	var go := Button.new()
+	go.text = tr("EXP_GO")
+	var blocker := X.dispatch_blocker(_exp_place, ids)
+	go.disabled = blocker != ""
+	go.pressed.connect(func() -> void:
+		if GameState.expeditions.dispatch(_exp_place, ids):
+			_exp_team.clear()
+			_refresh_lists())
+	go_row.add_child(go)
+	if blocker != "":
+		var why := Label.new()
+		why.text = tr(blocker)
+		why.add_theme_color_override("font_color", BAD)
+		go_row.add_child(why)
+	_tabs.set_tab_title(3, "%s%s" % [tr("TAB_EXPEDITION"), "" if X.active.is_empty() else " ●"])
+
+
+func _update_exp_progress() -> void:
+	for e: Dictionary in GameState.expeditions.active:
+		var pair: Array = _exp_bars.get(int(e["id"]), [])
+		if pair.is_empty():
+			continue
+		(pair[0] as ProgressBar).value = GameState.expeditions.progress(e)
+		var left := GameState.expeditions.minutes_left(e)
+		(pair[1] as Label).text = (tr("EXP_RETURNING") + " " if e["recalled"] else "") + tr("EXP_ETA").format({"left": _hm(left)})
+
+
+# ------------------------------------------------------------------ night watch
+
+func _refresh_night() -> void:
+	if _night_box == null:
+		return
+	for c in _night_box.get_children():
+		c.queue_free()
+	_section(_night_box, tr("NIGHT"))
+	_night_info = Label.new()
+	_night_box.add_child(_night_info)
+	var alarm := int(GameState.built.get("can_alarm", 0)) > 0
+	_muted(_night_box, tr("NIGHT_ALARM") if alarm else tr("NIGHT_NO_ALARM"))
+	if not alarm:
+		var row := HBoxContainer.new()
+		_night_box.add_child(row)
+		var l := Label.new()
+		l.text = tr("NIGHT_WATCH") + ":"
+		row.add_child(l)
+		for s in GameState.survivors:
+			if not s.is_active():
+				continue
+			var cb := CheckBox.new()
+			cb.text = tr(s.name_key)
+			cb.button_pressed = s.guard
+			cb.disabled = not s.at_base
+			var sid := s.id
+			cb.toggled.connect(func(on: bool) -> void: GameState.set_guard(GameState._survivor(sid), on))
+			row.add_child(cb)
+	_refresh_night_info()
+
+
+func _refresh_night_info() -> void:
+	if _night_info == null or not is_instance_valid(_night_info):
+		return
+	var R: Raids = GameState.raids
+	_night_info.text = tr("NIGHT_INFO").format({"p": int(round(R.chance_tonight() * 100)),
+			"st": R.strength_tonight(), "d": R.defense()})
+
+
+# ------------------------------------------------------------------ reports
+
+func _on_report(r: Dictionary) -> void:
+	_reports.append(r)
+	if not _popup.visible:
+		_show_next_report()
+
+
+func _show_next_report() -> void:
+	if _reports.is_empty():
+		_popup.visible = false
+		return
+	var r: Dictionary = _reports.pop_front()
+	var lines: PackedStringArray = []
+	if r["kind"] == "expedition":
+		var place := GameData.display_name(GameData.locations[r["location"]])
+		lines.append(tr("REPORT_EXP_TITLE").format({"place": place}) + ("  " + tr("REPORT_RECALLED") if r["recalled"] else ""))
+		var loot: PackedStringArray = []
+		for id: String in r["loot"]:
+			loot.append("%s %d" % [_thing_name(id), int(r["loot"][id])])
+		lines.append("%s: %s" % [tr("REPORT_LOOT"), ", ".join(loot) if not loot.is_empty() else tr("REPORT_NOTHING")])
+		lines.append("%s: %s" % [tr("REPORT_INJURIES"), _injury_text(r["injuries"])])
+		if int(r.get("trace", 0)) > 0:
+			lines.append(tr("REPORT_TRACE"))
+	else:
+		lines.append("%s — %s" % [tr("REPORT_RAID_TITLE"), tr("RAID_" + String(r["result"]).to_upper())])
+		lines.append(tr("REPORT_RAID_LINE").format({"st": r["strength"], "d": r["defense"], "g": r["guards"]}))
+		lines.append("%s: %s" % [tr("REPORT_INJURIES"), _injury_text(r["injuries"])])
+		if not r["broken"].is_empty():
+			var names: PackedStringArray = []
+			for fid: String in r["broken"]:
+				names.append(_thing_name(fid))
+			lines.append("%s: %s" % [tr("REPORT_BROKEN"), ", ".join(names)])
+		if not r["lost"].is_empty():
+			var lost: PackedStringArray = []
+			for id: String in r["lost"]:
+				lost.append("%s %d" % [_thing_name(id), int(r["lost"][id])])
+			lines.append("%s: %s" % [tr("REPORT_LOST"), ", ".join(lost)])
+	_popup_label.text = "\n".join(lines)
+	_popup.visible = true
+	_popup.reset_size()
+
+
+func _close_report() -> void:
+	_show_next_report()
+
+
+func _injury_text(list: Array) -> String:
+	if list.is_empty():
+		return tr("REPORT_NO_INJURY")
+	var parts: PackedStringArray = []
+	for i: Dictionary in list:
+		var s := GameState._survivor(int(i["id"]))
+		var kind := tr("REPORT_PATCHED") if i["kind"] == "patched" else tr("INJ_" + String(i["kind"]).to_upper())
+		parts.append("%s %s" % [tr(s.name_key) if s else "?", kind])
+	return ", ".join(parts)
+
+
+# ------------------------------------------------------------------ small helpers
+
+func _section(list: Container, text: String) -> void:
+	var l := Label.new()
+	l.text = "— %s —" % text
+	l.add_theme_color_override("font_color", Color(0.85, 0.75, 0.40))
+	list.add_child(l)
+
+
+func _muted(list: Container, text: String) -> void:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(360, 0)
+	l.add_theme_color_override("font_color", MUTED)
+	list.add_child(l)
+
+
+## In-game minutes as "4h 30m" / "4시간 30분".
+func _hm(game_minutes: float) -> String:
+	var m := int(round(game_minutes))
+	var h := m / 60
+	var r := m % 60
+	if h == 0:
+		return tr("HM_M").format({"m": r})
+	if r == 0:
+		return tr("HM_H").format({"h": h})
+	return tr("HM_HM").format({"h": h, "m": r})

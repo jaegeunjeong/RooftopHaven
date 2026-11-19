@@ -22,7 +22,16 @@ var at_base: bool = true
 var forced_sleep_minutes: int = 0   # fell asleep from exhaustion
 var collapsed_minutes: int = 0      # time since health hit 0
 var upset_minutes: int = 0          # stomach upset from dirty water
-var injury: String = ""             # "", "light", "serious", "infected" (used from step 4)
+var injury: String = ""             # "", "light", "serious", "infected"
+var injury_minutes: int = 0         # time spent with the current injury
+var splinted: bool = false          # serious injury given first aid
+var disinfect_doses: int = 0        # infected: doses taken (3 cures)
+var last_dose_day: int = 0
+var guard: bool = false             # stays up on night watch (22:00-04:00)
+var expedition_id: int = 0          # 0 = at the base
+var carried_food: int = 0           # rations packed for an expedition
+var carried_water: int = 0          # bottles packed for an expedition
+var wet: bool = false
 var cause_of_death: String = ""
 
 
