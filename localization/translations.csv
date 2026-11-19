@@ -108,3 +108,34 @@ CAUSE_STARVATION,starvation,굶주림·갈증
 RESULT_RESCUED,Rescued! The helicopter arrived,구조 성공! 헬기가 왔다
 RESULT_WIPED_OUT,Everyone is gone,전멸
 RESULT_BASE_COLLAPSED,The base fell apart,거점 붕괴
+ITEM_MEAT_SKEWER,Meat skewer,고기 꼬치
+TAB_BASE,Base,거점
+TAB_BUILD,Build,짓기
+TAB_CRAFT,Craft,제작
+TAB_WORK,Work,작업
+STORAGE_SLOTS,Storage,창고 칸
+DEFENSE,Defense,방어력
+HOURS_FMT,{h}h (real {real}),{h}시간 (실제 {real})
+MINUTES_FMT,{m} min (real {real}),{m}분 (실제 {real})
+REAL_SECONDS,{s}s,{s}초
+REAL_MINUTES,{m} min,{m}분
+NEEDS,needs,필요:
+BUILT,built,지음
+HAVE,have,보유
+FUEL_OR_WOOD,fuel or wood 1,연료 또는 목재 1
+WORK_EMPTY,Nothing queued. Pick something in Build or Craft.,작업이 없습니다. 짓기나 제작 탭에서 고르세요.
+WAITING,waiting,대기 중
+CANCEL,Cancel,취소
+FREE,no materials,재료 없음
+REASON_NEED_ITEM,Short {n} {item},{item} {n}개 부족
+REASON_NEED_TOOL,Needs a {item},{item} 필요
+REASON_NEED_FACILITY,Needs {item},{item} 필요
+REASON_NEED_FUEL,Needs fuel or wood,연료나 목재 필요
+REASON_NOT_BUILDABLE,Not available,지을 수 없음
+WARN_BROKE,A {item} wore out,{item}이(가) 닳아서 부서졌다
+WARN_BUILT,{name} finished building {item},{name}이(가) {item}을(를) 다 지었다
+WARN_CRAFTED,{name} made {item},{name}이(가) {item}을(를) 만들었다
+WARN_ACCIDENT,{name} got hurt while working,{name}이(가) 작업하다 다쳤다
+INJ_LIGHT,light injury,경상
+INJ_SERIOUS,serious injury,중상
+INJ_INFECTED,infected,감염

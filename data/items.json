@@ -108,6 +108,13 @@
 			"spoil_days": 2
 		},
 		{
+			"id": "meat_skewer",
+			"name": "ITEM_MEAT_SKEWER",
+			"category": "food",
+			"food": 35,
+			"spoil_days": 1
+		},
+		{
 			"id": "ration",
 			"name": "ITEM_RATION",
 			"category": "consumable",

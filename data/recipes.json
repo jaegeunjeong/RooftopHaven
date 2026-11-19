@@ -253,6 +253,19 @@
 			"name": "ITEM_CLOTH_BAG"
 		},
 		{
+			"id": "meat_skewer",
+			"output": {
+				"meat_skewer": 1
+			},
+			"inputs": {
+				"small_meat": 2
+			},
+			"station": "stove",
+			"minutes": 15,
+			"fuel": 1,
+			"name": "ITEM_MEAT_SKEWER"
+		},
+		{
 			"id": "ration",
 			"output": {
 				"ration": 1

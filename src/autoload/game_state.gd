@@ -11,13 +11,17 @@ signal morale_changed(value: float)
 signal warning(text: String)
 signal survivor_died(survivor: Survivor)
 signal run_ended(result: StringName, score: int)
+signal queue_changed
+signal built_changed
 
 const MIN_PER_HOUR := 60.0
 
 var survivors: Array[Survivor] = []
 var inventory: Dictionary = {}          # item id -> count
-var raw_food: Array[Dictionary] = []    # {item, day} batches that spoil
-var durability: Dictionary = {}         # tool item id -> remaining uses (pooled)
+var raw_food: Array[Dictionary] = []    # {item, day} batches of anything that spoils
+var durability: Dictionary = {}         # item id -> remaining uses, pooled over all copies
+var tasks: Array[Dictionary] = []       # work queue, see queue_build() / queue_craft()
+var cooks_today: int = 0
 var built: Dictionary = {}              # facility id -> count
 var morale: float = 60.0
 var morale_zero_minutes: int = 0
@@ -62,6 +66,10 @@ func new_run(seed_value: int = 0) -> void:
 		inventory[k] = int(start["inventory"][k])
 	raw_food.clear()
 	durability.clear()
+	tasks.clear()
+	cooks_today = 0
+	for k: String in inventory:
+		_add_durability(k, count(k))
 	built.clear()
 	for fid: String in GameData.facilities:
 		if GameData.facilities[fid].get("built_at_start", false):
@@ -81,6 +89,8 @@ func new_run(seed_value: int = 0) -> void:
 	survivors_changed.emit()
 	inventory_changed.emit()
 	morale_changed.emit(morale)
+	queue_changed.emit()
+	built_changed.emit()
 
 
 # ------------------------------------------------------------------ queries
@@ -133,12 +143,10 @@ func _daily_need(stat: String) -> float:
 func add_item(item_id: String, n: int = 1) -> void:
 	if n <= 0:
 		return
-	var it: Dictionary = GameData.item(item_id)
-	if it.get("category", "") == "food_raw":
+	if _spoils(item_id):
 		for i in n:
 			raw_food.append({"item": item_id, "day": GameClock.day})
-	elif it.has("durability") and it.get("category", "") in ["tool", "survival"] and item_id == "water_filter":
-		durability[item_id] = int(durability.get(item_id, 0)) + int(it["durability"]) * n
+	_add_durability(item_id, n)
 	inventory[item_id] = count(item_id) + n
 	inventory_changed.emit()
 
@@ -147,7 +155,10 @@ func take_item(item_id: String, n: int = 1) -> bool:
 	if count(item_id) < n:
 		return false
 	inventory[item_id] = count(item_id) - n
-	if GameData.item(item_id).get("category", "") == "food_raw":
+	if GameData.item(item_id).has("durability"):
+		var per := int(GameData.item(item_id)["durability"])
+		durability[item_id] = min(int(durability.get(item_id, 0)), count(item_id) * per)
+	if _spoils(item_id):
 		for i in n:
 			for j in raw_food.size():
 				if raw_food[j]["item"] == item_id:
@@ -155,6 +166,283 @@ func take_item(item_id: String, n: int = 1) -> bool:
 					break
 	inventory_changed.emit()
 	return true
+
+
+func _spoils(item_id: String) -> bool:
+	return GameData.item(item_id).get("spoil_days") != null
+
+
+func _add_durability(item_id: String, n: int) -> void:
+	var it: Dictionary = GameData.item(item_id)
+	if it.has("durability") and n > 0:
+		durability[item_id] = int(durability.get(item_id, 0)) + int(it["durability"]) * n
+
+
+## Use one durability point of a tool. When a copy wears out it leaves the storeroom.
+func wear(item_id: String, uses: int = 1) -> void:
+	if count(item_id) <= 0:
+		return
+	var per := int(GameData.item(item_id).get("durability", 1))
+	durability[item_id] = max(0, int(durability.get(item_id, 0)) - uses)
+	var left := int(ceil(float(durability[item_id]) / float(per)))
+	if left < count(item_id):
+		inventory[item_id] = left
+		_warn("WARN_BROKE", null, {"item": GameData.display_name(GameData.item(item_id))})
+		inventory_changed.emit()
+
+
+## Storeroom slots in use / available (stack of `stack` per slot).
+func storage_used() -> int:
+	var stack := int(GameData.config["storage"]["stack"])
+	var used := 0
+	for id: String in inventory:
+		used += int(ceil(float(count(id)) / float(stack)))
+	return used
+
+
+func storage_capacity() -> int:
+	var shelf := int(GameData.facility("storage_shelf").get("effects", {}).get("storage_slots", 20))
+	return int(GameData.config["storage"]["base_slots"]) + shelf * int(built.get("storage_shelf", 0))
+
+
+func defense_from_facilities() -> int:
+	var total := 0
+	for fid: String in built:
+		var f: Dictionary = GameData.facility(fid)
+		if f.get("kind", "") == "defense":
+			total += int(f.get("effects", {}).get("defense", 0)) * int(built[fid])
+	return total
+
+
+# ------------------------------------------------------------------ building & crafting
+
+## Why something can't be started right now ("" means it can).
+func build_blocker(fid: String) -> String:
+	var f: Dictionary = GameData.facility(fid)
+	if f.is_empty() or f.get("built_at_start", false):
+		return "REASON_NOT_BUILDABLE"
+	for req: String in f.get("requires", []):
+		if GameData.items.has(req) and count(req) <= 0:
+			return "REASON_NEED_TOOL:" + req
+		if GameData.facilities.has(req) and int(built.get(req, 0)) <= 0:
+			return "REASON_NEED_FACILITY:" + req
+	return _missing(f.get("cost", {}))
+
+
+func craft_blocker(rid: String) -> String:
+	var r: Dictionary = GameData.recipes.get(rid, {})
+	if r.is_empty():
+		return "REASON_NOT_BUILDABLE"
+	var station := String(r.get("station", ""))
+	if not _has_station(station):
+		return "REASON_NEED_STATION:" + station
+	if r.has("uses_durability") and count(String(r["uses_durability"])) <= 0:
+		return "REASON_NEED_TOOL:" + String(r["uses_durability"])
+	var m := _missing(r.get("inputs", {}))
+	if m != "":
+		return m
+	if int(r.get("fuel", 0)) > 0 and count("fuel") + count("wood") < int(r["fuel"]):
+		return "REASON_NEED_FUEL"
+	return ""
+
+
+func _has_station(station: String) -> bool:
+	for fid: String in built:
+		if int(built[fid]) > 0 and GameData.facility(fid).get("effects", {}).get("station", "") == station:
+			return true
+	return false
+
+
+func _missing(cost: Dictionary) -> String:
+	for id: String in cost:
+		if count(id) < int(cost[id]):
+			return "REASON_NEED_ITEM:%s:%d" % [id, int(cost[id]) - count(id)]
+	return ""
+
+
+## Queue a facility. Materials are set aside now and returned if cancelled.
+func queue_build(fid: String) -> bool:
+	if build_blocker(fid) != "":
+		return false
+	var f: Dictionary = GameData.facility(fid)
+	var cost: Dictionary = f.get("cost", {})
+	for id: String in cost:
+		take_item(id, int(cost[id]))
+	var hours := float(f.get("build_hours", GameData.config["build"]["hours"].get(f.get("tier", "early"), 2)))
+	_add_task({"kind": "build", "id": fid, "spent": cost.duplicate(), "fuel": "",
+			"total": hours * MIN_PER_HOUR, "done": 0.0, "worker": 0})
+	return true
+
+
+func queue_craft(rid: String) -> bool:
+	if craft_blocker(rid) != "":
+		return false
+	var r: Dictionary = GameData.recipes[rid]
+	var spent: Dictionary = r.get("inputs", {}).duplicate()
+	for id: String in spent:
+		take_item(id, int(spent[id]))
+	var fuel_used := ""
+	if int(r.get("fuel", 0)) > 0:
+		fuel_used = "fuel" if count("fuel") > 0 else "wood"
+		take_item(fuel_used, int(r["fuel"]))
+	_add_task({"kind": "craft", "id": rid, "spent": spent, "fuel": fuel_used,
+			"total": float(r.get("minutes", 30)), "done": 0.0, "worker": 0})
+	return true
+
+
+func cancel_task(index: int) -> void:
+	if index < 0 or index >= tasks.size():
+		return
+	var t: Dictionary = tasks[index]
+	for id: String in t["spent"]:
+		add_item(id, int(t["spent"][id]))
+	if t["fuel"] != "":
+		add_item(t["fuel"], 1)
+	_release_worker(t)
+	tasks.remove_at(index)
+	queue_changed.emit()
+
+
+func task_name(t: Dictionary) -> String:
+	if t["kind"] == "build":
+		return GameData.display_name(GameData.facility(t["id"]))
+	return GameData.display_name(GameData.recipes[t["id"]])
+
+
+func task_of(s: Survivor) -> Dictionary:
+	for t in tasks:
+		if int(t["worker"]) == s.id:
+			return t
+	return {}
+
+
+func _add_task(t: Dictionary) -> void:
+	tasks.append(t)
+	queue_changed.emit()
+	inventory_changed.emit()
+
+
+func _release_worker(t: Dictionary) -> void:
+	for s in survivors:
+		if s.id == int(t["worker"]) and s.activity == Survivor.Activity.WORK:
+			s.activity = Survivor.Activity.REST
+	t["worker"] = 0
+
+
+func _can_work(s: Survivor) -> bool:
+	var auto: Dictionary = GameData.config["auto"]
+	var hour := GameClock.hour
+	var night := hour >= int(auto["sleep_from_hour"]) or hour < int(auto["wake_hour"])
+	return s.is_active() and s.at_base and not night and s.forced_sleep_minutes <= 0 \
+			and s.stamina >= float(auto["sleep_if_stamina_below"]) \
+			and s.health >= float(GameData.config["stats"]["bands"]["caution"]) \
+			and s.activity != Survivor.Activity.EXPEDITION
+
+
+## Give waiting tasks to free survivors (mechanic first), stop work at night.
+func _assign_work() -> void:
+	var changed := false
+	for t in tasks:
+		var w := _survivor(int(t["worker"]))
+		if w and not _can_work(w):
+			_release_worker(t)
+			changed = true
+	for t in tasks:
+		if int(t["worker"]) != 0:
+			continue
+		var best: Survivor = null
+		for s in survivors:
+			if not _can_work(s) or not task_of(s).is_empty():
+				continue
+			if best == null or (s.job == "mechanic" and best.job != "mechanic"):
+				best = s
+		if best:
+			t["worker"] = best.id
+			best.activity = Survivor.Activity.WORK
+			changed = true
+	if changed:
+		queue_changed.emit()
+
+
+func _work_speed(s: Survivor) -> float:
+	var speed := 1.0
+	var jm := float(GameData.job(s.job).get("build_time_mult", 1.0))
+	speed /= jm
+	var mc: Dictionary = GameData.config["morale"]
+	if morale >= float(mc["high"]):
+		speed *= float(mc["high_work_mult"])
+	elif morale < float(mc["low"]):
+		speed *= float(mc["low_work_mult"])
+	var de: Dictionary = GameData.config["stats"]["danger_effects"]
+	var caution := float(GameData.config["stats"]["bands"]["caution"])
+	if s.food < caution:
+		speed *= float(de["food_work_mult"])
+	if s.water < caution:
+		speed *= float(de["water_work_mult"])
+	if s.injury == "light":
+		speed *= float(GameData.injuries["light"]["work_mult"])
+	elif s.injury == "serious":
+		speed *= float(GameData.injuries["serious"]["work_mult"])
+	return speed
+
+
+func _progress_work() -> void:
+	var finished: Array[Dictionary] = []
+	for t in tasks:
+		var w := _survivor(int(t["worker"]))
+		if w == null:
+			continue
+		t["done"] = float(t["done"]) + _work_speed(w)
+		if float(t["done"]) >= float(t["total"]):
+			finished.append(t)
+	for t in finished:
+		_finish_task(t)
+	if not finished.is_empty():
+		queue_changed.emit()
+
+
+func _finish_task(t: Dictionary) -> void:
+	var worker := _survivor(int(t["worker"]))
+	_release_worker(t)
+	tasks.erase(t)
+	if t["kind"] == "build":
+		var fid: String = t["id"]
+		built[fid] = int(built.get(fid, 0)) + 1
+		for req: String in GameData.facility(fid).get("requires", []):
+			if GameData.items.has(req):
+				wear(req)
+		trace += float(GameData.night["trace"]["sources"]["build"])
+		built_changed.emit()
+		_warn("WARN_BUILT", worker, {"item": task_name(t)})
+	else:
+		var r: Dictionary = GameData.recipes[t["id"]]
+		var out: Dictionary = r.get("output", {})
+		for id: String in out:
+			add_item(id, int(out[id]))
+		if r.has("uses_durability"):
+			wear(String(r["uses_durability"]))
+		if r.get("station", "") == "stove":
+			cooks_today += 1
+			if cooks_today == 3:
+				trace += float(GameData.night["trace"]["sources"]["cooks_3_per_day"])
+		_warn("WARN_CRAFTED", worker, {"item": task_name(t)})
+	# small chance of hurting yourself while working
+	if worker and worker.injury == "":
+		var b: Dictionary = GameData.config["build"]
+		var p := float(b["accident_chance"])
+		if worker.stamina < float(GameData.config["stats"]["bands"]["caution"]):
+			p = float(b["accident_chance_tired"])
+		if _rng.randf() < p:
+			worker.injury = "light"
+			change_morale(float(GameData.config["morale"]["daily"]["injury"]))
+			_warn("WARN_ACCIDENT", worker)
+
+
+func _survivor(sid: int) -> Survivor:
+	for s in survivors:
+		if s.id == sid:
+			return s
+	return null
 
 
 # ------------------------------------------------------------------ clock
@@ -174,6 +462,7 @@ func advance_minute() -> void:
 	var sleep_time := hour >= int(auto["sleep_from_hour"]) or hour < int(auto["wake_hour"])
 	var beds := _sleep_spots()
 	var spot := 0
+	_assign_work()
 	for s in survivors:
 		if s.life == Survivor.Life.COLLAPSED:
 			_tick_collapsed(s)
@@ -184,8 +473,10 @@ func advance_minute() -> void:
 		if s.forced_sleep_minutes > 0:
 			s.activity = Survivor.Activity.SLEEP
 			s.forced_sleep_minutes -= 1
-		elif s.activity == Survivor.Activity.EXPEDITION or s.activity == Survivor.Activity.WORK:
-			pass  # set by later steps
+		elif s.activity == Survivor.Activity.EXPEDITION:
+			pass  # set by the expedition step
+		elif not task_of(s).is_empty():
+			s.activity = Survivor.Activity.WORK
 		elif sleep_time or (s.activity == Survivor.Activity.SLEEP and s.stamina < 80.0) \
 				or s.stamina < float(auto["sleep_if_stamina_below"]):
 			s.activity = Survivor.Activity.SLEEP
@@ -240,6 +531,7 @@ func advance_minute() -> void:
 		if s.health <= 0.0:
 			s.health = 0.0
 			_collapse(s)
+	_progress_work()
 	_tick_morale()
 	_check_end()
 	survivors_changed.emit()
@@ -269,7 +561,7 @@ func _sleep_spots() -> Array[float]:
 
 func _eat(s: Survivor) -> void:
 	# cooked food that spoils goes first, then canned food (cold)
-	for id: String in ["veggie_soup", "ration", "canned_food"]:
+	for id: String in ["heated_can", "meat_skewer", "veggie_soup", "canned_food", "ration"]:
 		if count(id) > 0:
 			var it: Dictionary = GameData.item(id)
 			take_item(id)
@@ -384,6 +676,7 @@ func morning() -> void:
 	raw_food = kept
 	if spoiled > 0:
 		_warn("WARN_SPOILED", null)
+	cooks_today = 0
 	# morale from yesterday's meals
 	var md: Dictionary = cfg["morale"]["daily"]
 	if foods_today.size() >= 2:
@@ -395,6 +688,14 @@ func morning() -> void:
 	# trace decay
 	var tr_cfg: Dictionary = GameData.night["trace"]
 	trace = max(0.0, trace - float(tr_cfg["morning_decay"]) - (float(tr_cfg["rain_extra_decay"]) if rain else 0.0))
+	# facilities that produce something every morning (rat trap); their smell counts for today
+	for fid: String in built:
+		var eff: Dictionary = GameData.facility(fid).get("effects", {})
+		var dr: Dictionary = eff.get("daily_random", {})
+		for id: String in dr:
+			for k in int(built[fid]):
+				add_item(id, _rng.randi_range(int(dr[id][0]), int(dr[id][1])))
+		trace += float(eff.get("daily_trace", 0)) * int(built[fid])
 	# morale zero: someone may leave
 	if morale <= 0.0 and _rng.randf() < float(cfg["morale"]["zero_leave_chance"]):
 		var here := living().filter(func(x: Survivor) -> bool: return x.is_active())
@@ -474,10 +775,11 @@ func _make_weather() -> void:
 
 
 ## Warnings fire once per survivor per in-game hour so the log stays readable.
-func _warn(key: String, s: Survivor) -> void:
-	var tag := "%s:%d:%d:%d" % [key, s.id if s else 0, GameClock.day, GameClock.hour]
-	if _warned.has(tag):
+func _warn(key: String, s: Survivor, extra: Dictionary = {}) -> void:
+	var tag := "%s:%d:%d:%d:%s" % [key, s.id if s else 0, GameClock.day, GameClock.hour, extra.get("item", "")]
+	if _warned.has(tag) and extra.is_empty():
 		return
 	_warned[tag] = true
-	var who := tr(s.name_key) if s else ""
-	warning.emit(tr(key).format({"name": who}))
+	var fields := {"name": tr(s.name_key) if s else ""}
+	fields.merge(extra)
+	warning.emit(tr(key).format(fields))
