@@ -17,6 +17,8 @@ signal expedition_returned(report: Dictionary)
 signal raid_resolved(report: Dictionary)
 signal night_changed
 signal raid_warning(info: Dictionary)
+signal radio_asked(pending: Dictionary)
+signal radio_answered(result: Dictionary)
 
 const MIN_PER_HOUR := 60.0
 
@@ -45,6 +47,7 @@ var result: StringName = &""
 
 var expeditions: Expeditions
 var raids: Raids
+var radio: Radio
 
 var _rng := RandomNumberGenerator.new()
 var _warned: Dictionary = {}
@@ -53,10 +56,17 @@ var _warned: Dictionary = {}
 func _init() -> void:
 	expeditions = Expeditions.new(self)
 	raids = Raids.new(self)
+	radio = Radio.new(self)
+	radio.asked.connect(func(p: Dictionary) -> void: radio_asked.emit(p))
+	radio.answered.connect(func(r: Dictionary) -> void: radio_answered.emit(r))
 	expeditions.returned.connect(func(r: Dictionary) -> void: expedition_returned.emit(r))
 	raids.resolved.connect(func(r: Dictionary) -> void: raid_resolved.emit(r))
 	raids.changed.connect(func() -> void: night_changed.emit())
 	raids.warning.connect(func(i: Dictionary) -> void: raid_warning.emit(i))
+
+
+func _process(delta: float) -> void:
+	radio.process_real(delta)
 
 
 func _ready() -> void:
@@ -111,6 +121,7 @@ func new_run(seed_value: int = 0) -> void:
 	_warned.clear()
 	expeditions.reset()
 	raids.reset()
+	radio.reset()
 	_make_weather()
 	survivors_changed.emit()
 	inventory_changed.emit()
@@ -641,6 +652,7 @@ func advance_minute() -> void:
 			_collapse(s)
 	_progress_work()
 	expeditions.tick()
+	radio.tick()
 	if GameClock.hour == int(GameData.night.get("raid_check_hour", 22)) and GameClock.minute == 0:
 		_light_up()
 	raids.tick()
@@ -666,9 +678,18 @@ func _sleep_spots() -> Array[float]:
 	for i in count("sleeping_bag"):
 		spots.append(float(GameData.item("sleeping_bag").get("sleep_gain", 8)))
 	var bed_gain := float(GameData.facility("bed").get("effects", {}).get("sleep_gain", 7))
-	for i in int(built.get("bed", 0)):
+	for i in int(built.get("bed", 0)) + int(built.get("infirmary_bed", 0)):
 		spots.append(bed_gain)
 	return spots
+
+
+## People at the base tonight without a bed or a sleeping bag.
+func floor_sleepers() -> int:
+	var n := 0
+	for s in survivors:
+		if s.is_active() and s.at_base:
+			n += 1
+	return max(0, n - _sleep_spots().size())
 
 
 func _eat(s: Survivor) -> void:
@@ -909,6 +930,10 @@ func morning() -> void:
 		change_morale(float(md["same_food_two_days"]))
 	foods_yesterday = foods_today.duplicate()
 	foods_today.clear()
+	var fl: Dictionary = cfg["morale"].get("floor_sleepers", {})
+	if not fl.is_empty() and floor_sleepers() >= int(fl["min"]):
+		change_morale(float(fl["morale"]))
+		_warn("WARN_FLOOR", null, {"n": floor_sleepers()})
 	# trace decay
 	var tr_cfg: Dictionary = GameData.night["trace"]
 	trace = max(0.0, trace - float(tr_cfg["morning_decay"]) - (float(tr_cfg["rain_extra_decay"]) if rain else 0.0))
@@ -953,30 +978,48 @@ func _end(r: StringName) -> void:
 	run_ended.emit(r, compute_score())
 
 
-## Score formula from score.json (helicopter boarding = active survivors at the base).
-func compute_score() -> int:
+## Score lines for the result screen: [label key, count, points].
+func score_breakdown() -> Array:
 	var sc: Dictionary = GameData.score
 	var won := result == &"rescued"
 	var days := int(GameData.config["prototype"]["run_days"]) if won else GameClock.day
-	var total := days * int(sc["per_day"])
+	var rows: Array = [["SCORE_DAYS", days, days * int(sc["per_day"])]]
 	if won:
-		total += int(sc["win"])
+		rows.append(["SCORE_WIN", 1, int(sc["win"])])
+		var boarded := 0
 		for s in survivors:
 			if s.is_active() and s.at_base:
-				total += int(sc["per_boarded"])
-	total += joined * int(sc["per_joined"]) + deaths * int(sc["per_death"])
+				boarded += 1
+		rows.append(["SCORE_BOARDED", boarded, boarded * int(sc["per_boarded"])])
+	if joined > 0:
+		rows.append(["SCORE_JOINED", joined, joined * int(sc["per_joined"])])
+	if deaths > 0:
+		rows.append(["SCORE_DEATHS", deaths, deaths * int(sc["per_death"])])
+	var fw := 0
+	var mats := 0
 	for id: String in inventory:
 		var cat := String(GameData.item(id).get("category", ""))
-		var n := count(id)
 		if cat in ["food", "water", "food_raw"]:
-			total += n * int(sc["per_food_water"])
+			fw += count(id)
 		elif cat == "material":
-			total += n * int(sc["per_material"])
+			mats += count(id)
+	rows.append(["SCORE_FOOD_WATER", fw, fw * int(sc["per_food_water"])])
+	rows.append(["SCORE_MATERIALS", mats, mats * int(sc["per_material"])])
+	if not blueprints.is_empty():
+		rows.append(["SCORE_BLUEPRINTS", blueprints.size(), blueprints.size() * int(sc["per_blueprint"])])
+	return rows
+
+
+## Score formula from score.json (helicopter boarding = active survivors at the base).
+func compute_score() -> int:
+	var total := 0
+	for row: Array in score_breakdown():
+		total += int(row[2])
 	return total
 
 
 static func grade(score_value: int) -> String:
-	for g: Array in GameData.score["grades"]:
+	for g: Array in GameData.score.get("prototype_grades", GameData.score["grades"]):
 		if score_value >= int(g[1]):
 			return String(g[0])
 	return "C"

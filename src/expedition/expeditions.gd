@@ -16,6 +16,7 @@ var gs: Node
 var active: Array[Dictionary] = []
 var stock: Dictionary = {}       # location id -> 0.3 .. 1.0 (how much is left to loot)
 var _next_id := 1
+var trips := 0
 
 
 func _init(state: Node) -> void:
@@ -26,6 +27,7 @@ func reset() -> void:
 	active.clear()
 	stock.clear()
 	_next_id = 1
+	trips = 0
 	for lid: String in GameData.locations:
 		stock[lid] = 1.0
 
@@ -212,6 +214,8 @@ func dispatch(lid: String, ids: Array) -> bool:
 		s.guard = false
 		s.wet = false
 	_share_supplies(e, members)
+	trips += 1
+	gs.radio.schedule(e)
 	active.append(e)
 	gs.warn("WARN_EXP_LEFT", null, {"place": GameData.display_name(GameData.locations[lid])})
 	changed.emit()
@@ -358,6 +362,7 @@ func _finish(e: Dictionary) -> void:
 	var night_penalty := night * (float(GameData.item("torch").get("expedition", {}).get("night_penalty_mult", 0.5)) if torch else 1.0)
 	report["night"] = night
 	var mult := team_loot_mult(able.size()) * stock_of(lid) * frac * (1.0 + float(nr.get("loot_bonus", 0.3)) * night)
+	mult *= 1.0 + float(e.get("loot_mult_bonus", 0.0))
 	var loot: Dictionary = {}
 	for id: String in loc["loot"]:
 		var r: Array = loc["loot"][id]
@@ -369,26 +374,27 @@ func _finish(e: Dictionary) -> void:
 		for id: String in bonus:
 			loot[id] = int(loot.get(id, 0)) + int(bonus[id])
 	var rare_mult := 1.0 + (float(nr.get("rare_mult", 2.0)) - 1.0) * night
-	for rare: Dictionary in loc.get("rare", []):
-		if GameClock.day < int(rare.get("from_day", 0)):
-			continue
-		if rare.has("blueprint"):
+	for _roll in 1 + int(e.get("extra_rare", 0)):
+		for rare: Dictionary in loc.get("rare", []):
+			if GameClock.day < int(rare.get("from_day", 0)):
+				continue
+			if rare.has("blueprint"):
+				if rng.randf() < float(rare["chance"]) * frac * rare_mult:
+					var bp := String(rare["blueprint"])
+					if gs.blueprints.has(bp):
+						loot["parts"] = int(loot.get("parts", 0)) + 2
+					else:
+						gs.blueprints[bp] = true
+						report["blueprint"] = bp
+						gs.change_morale(float(GameData.config["morale"]["daily"]["big_success"]))
+						gs.warn("WARN_BLUEPRINT", null, {"item": GameData.display_name(GameData.facility(bp))})
+				continue
+			if not rare.has("item"):
+				continue
 			if rng.randf() < float(rare["chance"]) * frac * rare_mult:
-				var bp := String(rare["blueprint"])
-				if gs.blueprints.has(bp):
-					loot["parts"] = int(loot.get("parts", 0)) + 2
-				else:
-					gs.blueprints[bp] = true
-					report["blueprint"] = bp
-					gs.change_morale(float(GameData.config["morale"]["daily"]["big_success"]))
-					gs.warn("WARN_BLUEPRINT", null, {"item": GameData.display_name(GameData.facility(bp))})
-			continue
-		if not rare.has("item"):
-			continue
-		if rng.randf() < float(rare["chance"]) * frac * rare_mult:
-			var c: Variant = rare.get("count", 1)
-			var n := rng.randi_range(int(c[0]), int(c[1])) if c is Array else int(c)
-			loot[rare["item"]] = int(loot.get(rare["item"], 0)) + n
+				var c: Variant = rare.get("count", 1)
+				var n := rng.randi_range(int(c[0]), int(c[1])) if c is Array else int(c)
+				loot[rare["item"]] = int(loot.get(rare["item"], 0)) + n
 	# bag space: 8 slots of 5 per survivor
 	var cap := able.size() * int(rules().get("bag_slots", 8)) * int(rules().get("stack_in_bag", 5))
 	var total := 0
@@ -435,6 +441,10 @@ func _finish(e: Dictionary) -> void:
 		gs.wear("poncho")
 	if torch and night > 0.0:
 		gs.wear("torch")
+	var event_wear: Dictionary = e.get("wear", {})
+	for id: String in event_wear:
+		gs.wear(id, int(event_wear[id]))
+	report["radio"] = e["log"].duplicate()
 	for s in members:
 		s.carried_food = 0
 		s.carried_water = 0

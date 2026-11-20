@@ -248,3 +248,44 @@ REPORT_RAIDERS,Raiders,약탈자
 REPORT_INFECTED,Infected,감염체
 REPORT_TRAP,A spike trap took the edge off (-2),가시 함정이 힘을 뺐다 (-2)
 SALVAGE_INFO,"wood, scrap, cloth or plastic (needs a hammer)",목재·고철·천·플라스틱 중 하나 (망치 필요)
+WARN_FLOOR,{n} slept on the floor: morale -2,{n}명이 바닥에서 잤다: 사기 -2
+WARN_RADIO_OK,"Radio from {place}: ""{item}"" worked","{place} 무전: ""{item}"" 성공"
+WARN_RADIO_FAIL,"Radio from {place}: ""{item}"" went wrong","{place} 무전: ""{item}"" 실패"
+RADIO,Radio,무전
+RADIO_CHANCE_HIGH,likely,높음
+RADIO_CHANCE_MID,even,보통
+RADIO_CHANCE_LOW,risky,낮음
+RADIO_SAFE,(safe if no answer),(응답 없으면 이것)
+RADIO_RESULT_OK,Success,성공
+RADIO_RESULT_FAIL,Failed,실패
+RADIO_TIMEOUT,No answer: the team chose for themselves,응답 없음: 팀이 알아서 골랐다
+RADIO_EFFECT_HOURS,+{n}h,+{n}시간
+RADIO_EFFECT_LOOT,more loot,수확 증가
+RADIO_EFFECT_RARE,a rare find roll,드문 수확 한 번 더
+RADIO_EFFECT_TRACE,trace +{n},흔적 +{n}
+RADIO_EFFECT_WET,soaked,젖음
+RADIO_EFFECT_HEALTH,health {n},건강 {n}
+RADIO_EFFECT_BROKE,{item} broke,{item} 망가짐
+RADIO_EFFECT_PATCHED,{name} patched up,{name} 응급처치
+RADIO_EFFECT_LIGHT,{name} lightly hurt,{name} 경상
+RADIO_EFFECT_SERIOUS,{name} badly hurt,{name} 중상
+REPORT_RADIO,Radio,무전
+RESULT_TITLE,Run over,판 종료
+RESULT_DAY,Day {d},{d}일째
+RESULT_SURVIVORS,Survivors,생존자
+RESULT_GRADE,Grade {g},등급 {g}
+RESULT_AGAIN,Play again,한 판 더
+RESULT_QUIT,Quit,끝내기
+RESULT_RAIDS,Raids: {n} (held {h}),습격: {n}번 (막아냄 {h})
+RESULT_EXPEDITIONS,Expeditions: {n},원정: {n}번
+RESULT_BUILT,Facilities standing: {n},남은 시설: {n}개
+SCORE_DAYS,Days survived,버틴 날
+SCORE_WIN,Rescued,구조 성공
+SCORE_BOARDED,On the helicopter,헬기 탑승
+SCORE_JOINED,Joined,합류
+SCORE_DEATHS,Deaths,사망
+SCORE_FOOD_WATER,Food and water left,남은 음식·물
+SCORE_MATERIALS,Materials left,남은 재료
+SCORE_BLUEPRINTS,Blueprints,설계도
+SCORE_TOTAL,Total,합계
+RADIO_CHANCE_SURE,certain,확정

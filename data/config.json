@@ -116,6 +116,10 @@
 			"death": -25,
 			"stamina_collapse": -2,
 			"big_success": 8
+		},
+		"floor_sleepers": {
+			"min": 2,
+			"morale": -2
 		}
 	},
 	"storage": {

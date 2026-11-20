@@ -49,6 +49,12 @@ var _popup_label: Label
 var _reports: Array[Dictionary] = []
 var _alert: PanelContainer
 var _alert_label: Label
+var _radio: PanelContainer
+var _radio_title: Label
+var _radio_line: Label
+var _radio_choices: VBoxContainer
+var _radio_timer: ProgressBar
+var _result: PanelContainer
 
 
 func _ready() -> void:
@@ -66,12 +72,14 @@ func _ready() -> void:
 	GameState.inventory_changed.connect(_refresh_lists)
 	GameState.built_changed.connect(_refresh_lists)
 	GameState.queue_changed.connect(_refresh_lists)
-	GameState.morale_changed.connect(func(_v: float) -> void: _refresh_status())
+	GameState.morale_changed.connect(_on_morale_changed)
 	GameState.warning.connect(_on_warning)
 	GameState.run_ended.connect(_on_run_ended)
 	GameState.expedition_returned.connect(_on_report)
 	GameState.raid_resolved.connect(_on_report)
 	GameState.raid_warning.connect(_on_raid_warning)
+	GameState.radio_asked.connect(_on_radio_asked)
+	GameState.radio_answered.connect(_on_radio_answered)
 	GameState.night_changed.connect(_refresh_night)
 	GameState.expeditions.changed.connect(_update_exp_progress)
 	_on_minute_changed(GameClock.day, GameClock.hour, GameClock.minute)
@@ -212,6 +220,7 @@ func _build_ui() -> void:
 	ab.add_child(let)
 	_alert.visible = false
 	ui.add_child(_alert)
+	_build_radio_card(ui)
 
 
 func _make_base_tab() -> Control:
@@ -529,7 +538,9 @@ func _on_warning(text: String) -> void:
 
 
 func _on_run_ended(r: StringName, score_value: int) -> void:
-	_end_label.text = "%s\n%s %d (%s)" % [tr("RESULT_" + String(r).to_upper()), tr("SCORE"), score_value, GameState.grade(score_value)]
+	_alert.visible = false
+	_radio.visible = false
+	_show_result(r, score_value)
 
 
 # ------------------------------------------------------------------ expedition tab
@@ -744,6 +755,14 @@ func _show_next_report() -> void:
 			loot.append("%s %d" % [_thing_name(id), int(r["loot"][id])])
 		lines.append("%s: %s" % [tr("REPORT_LOOT"), ", ".join(loot) if not loot.is_empty() else tr("REPORT_NOTHING")])
 		lines.append("%s: %s" % [tr("REPORT_INJURIES"), _injury_text(r["injuries"])])
+		for entry: Dictionary in r.get("radio", []):
+			var ev: Dictionary = GameData.events.get(entry["event"], {})
+			var ch_text := ""
+			for c: Dictionary in ev.get("choices", []):
+				if c["id"] == entry["choice"]:
+					ch_text = tr(c["text"])
+			lines.append("%s: %s → %s%s" % [tr("REPORT_RADIO"), tr(ev.get("title", "")), ch_text,
+					" (%s)" % tr("RADIO_RESULT_OK" if entry["ok"] else "RADIO_RESULT_FAIL")])
 		if r.has("blueprint"):
 			lines.append(tr("REPORT_BLUEPRINT").format({"item": _thing_name(String(r["blueprint"]))}))
 		if float(r.get("night", 0.0)) > 0.0:
@@ -823,3 +842,200 @@ func _on_raid_warning(info: Dictionary) -> void:
 			tr("ALERT_INFO").format({"d": GameState.raids.defense()})]
 	_alert.visible = true
 	_alert.reset_size()
+
+
+# ------------------------------------------------------------------ radio card (step 6)
+
+func _process(_delta: float) -> void:
+	if _radio and _radio.visible and not GameState.radio.pending.is_empty():
+		var pnd: Dictionary = GameState.radio.pending
+		_radio_timer.value = float(pnd["left"]) / max(0.01, float(pnd["total"]))
+
+
+func _build_radio_card(ui: CanvasLayer) -> void:
+	_radio = PanelContainer.new()
+	_radio.theme = _theme
+	_radio.position = Vector2(96, 44)
+	_radio.custom_minimum_size = Vector2(300, 0)
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.07, 0.12, 0.10, 0.97)
+	st.border_color = Color(0.45, 0.85, 0.55)
+	st.set_border_width_all(2)
+	st.set_content_margin_all(8)
+	_radio.add_theme_stylebox_override("panel", st)
+	_radio.z_index = 40
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	_radio.add_child(v)
+	_radio_title = Label.new()
+	_radio_title.add_theme_color_override("font_color", Color(0.55, 0.95, 0.65))
+	v.add_child(_radio_title)
+	_radio_line = Label.new()
+	_radio_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_radio_line.custom_minimum_size = Vector2(284, 0)
+	v.add_child(_radio_line)
+	_radio_timer = ProgressBar.new()
+	_radio_timer.max_value = 1.0
+	_radio_timer.step = 0.001
+	_radio_timer.show_percentage = false
+	_radio_timer.custom_minimum_size = Vector2(284, 5)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.95, 0.75, 0.35)
+	_radio_timer.add_theme_stylebox_override("fill", fill)
+	v.add_child(_radio_timer)
+	_radio_choices = VBoxContainer.new()
+	v.add_child(_radio_choices)
+	_radio.visible = false
+	ui.add_child(_radio)
+
+
+func _on_radio_asked(pnd: Dictionary) -> void:
+	_radio_title.text = "%s · %s — %s" % [tr("RADIO"), GameData.display_name(GameData.locations[pnd["location"]]), tr(pnd["title"])]
+	_radio_line.text = "\"%s\"" % tr(pnd["line"])
+	for c in _radio_choices.get_children():
+		c.queue_free()
+	for c: Dictionary in pnd["choices"]:
+		var b := Button.new()
+		var p := float(c["chance"])
+		var label := tr("RADIO_CHANCE_HIGH") if p >= 0.7 else (tr("RADIO_CHANCE_MID") if p >= 0.5 else tr("RADIO_CHANCE_LOW"))
+		if p >= 1.0:
+			label = tr("RADIO_CHANCE_SURE")
+		b.text = "%s  [%s]%s" % [tr(c["text"]), label, ("  " + tr("RADIO_SAFE")) if c["default"] else ""]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var cid := String(c["id"])
+		b.pressed.connect(func() -> void: GameState.radio.answer(cid))
+		_radio_choices.add_child(b)
+	_radio_timer.value = 1.0
+	_radio.visible = true
+	_radio.reset_size()
+
+
+func _on_radio_answered(r: Dictionary) -> void:
+	_radio.visible = GameState.radio.pending.size() > 0
+	var parts: PackedStringArray = []
+	parts.append(tr("RADIO_TIMEOUT") if r.get("timed_out", false) else tr("RADIO_RESULT_OK" if r["ok"] else "RADIO_RESULT_FAIL"))
+	if r.get("timed_out", false):
+		parts.append(tr("RADIO_RESULT_OK" if r["ok"] else "RADIO_RESULT_FAIL"))
+	for fx: String in r.get("effects", []):
+		var kv := fx.split(":")
+		match kv[0]:
+			"hours":
+				parts.append(tr("RADIO_EFFECT_HOURS").format({"n": kv[1]}))
+			"loot":
+				parts.append(tr("RADIO_EFFECT_LOOT"))
+			"rare":
+				parts.append(tr("RADIO_EFFECT_RARE"))
+			"trace":
+				parts.append(tr("RADIO_EFFECT_TRACE").format({"n": kv[1]}))
+			"wet":
+				parts.append(tr("RADIO_EFFECT_WET"))
+			"health":
+				parts.append(tr("RADIO_EFFECT_HEALTH").format({"n": kv[1]}))
+			"broke":
+				parts.append(tr("RADIO_EFFECT_BROKE").format({"item": _thing_name(kv[1])}))
+			"patched", "light", "serious":
+				var sv := GameState._survivor(int(kv[1]))
+				parts.append(tr("RADIO_EFFECT_" + kv[0].to_upper()).format({"name": tr(sv.name_key) if sv else "?"}))
+	_on_warning("%s: %s" % [tr("RADIO"), " · ".join(parts)])
+
+
+# ------------------------------------------------------------------ result screen (step 7)
+
+func _show_result(r: StringName, score_value: int) -> void:
+	if _result:
+		_result.queue_free()
+	_result = PanelContainer.new()
+	_result.theme = _theme
+	_result.position = Vector2(60, 30)
+	_result.custom_minimum_size = Vector2(520, 300)
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.06, 0.065, 0.075, 0.98)
+	st.border_color = Color(0.85, 0.75, 0.40)
+	st.set_border_width_all(2)
+	st.set_content_margin_all(12)
+	_result.add_theme_stylebox_override("panel", st)
+	_result.z_index = 50
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	_result.add_child(v)
+	var title := Label.new()
+	title.text = "%s — %s" % [tr("RESULT_" + String(r).to_upper()), tr("RESULT_DAY").format({"d": GameClock.day})]
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color(0.55, 0.95, 0.65) if r == &"rescued" else Color(0.95, 0.50, 0.45))
+	v.add_child(title)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 24)
+	v.add_child(cols)
+	# left: people and the run
+	var left := VBoxContainer.new()
+	cols.add_child(left)
+	_section(left, tr("RESULT_SURVIVORS"))
+	for s in GameState.survivors:
+		var l := Label.new()
+		var state := tr("LIFE_" + Survivor.Life.keys()[s.life])
+		l.text = "%s · %s · %s" % [tr(s.name_key), tr(GameData.job(s.job).get("name", "")), state]
+		left.add_child(l)
+	var raids: Array[Dictionary] = GameState.raids.history
+	var held := 0
+	for x: Dictionary in raids:
+		if x["result"] in ["perfect", "held"]:
+			held += 1
+	var standing := 0
+	for fid: String in GameState.built:
+		if not GameData.facility(fid).get("built_at_start", false):
+			standing += int(GameState.built[fid])
+	for line: String in [tr("RESULT_RAIDS").format({"n": raids.size(), "h": held}),
+			tr("RESULT_EXPEDITIONS").format({"n": GameState.expeditions.trips}),
+			tr("RESULT_BUILT").format({"n": standing})]:
+		var l := Label.new()
+		l.text = line
+		l.add_theme_color_override("font_color", MUTED)
+		left.add_child(l)
+	# right: score
+	var right := VBoxContainer.new()
+	cols.add_child(right)
+	_section(right, tr("SCORE"))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 12)
+	right.add_child(grid)
+	for row: Array in GameState.score_breakdown():
+		for txt: String in [tr(String(row[0])), str(row[1]), "%+d" % int(row[2])]:
+			var l := Label.new()
+			l.text = txt
+			grid.add_child(l)
+	for txt: String in [tr("SCORE_TOTAL"), "", str(score_value)]:
+		var l := Label.new()
+		l.text = txt
+		l.add_theme_color_override("font_color", Color(0.95, 0.85, 0.50))
+		grid.add_child(l)
+	var g := Label.new()
+	g.text = tr("RESULT_GRADE").format({"g": GameState.grade(score_value)})
+	g.add_theme_font_size_override("font_size", 20)
+	g.add_theme_color_override("font_color", Color(0.95, 0.85, 0.50))
+	right.add_child(g)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 12)
+	v.add_child(buttons)
+	var again := Button.new()
+	again.text = tr("RESULT_AGAIN")
+	again.pressed.connect(_play_again)
+	buttons.add_child(again)
+	var quit := Button.new()
+	quit.text = tr("RESULT_QUIT")
+	quit.pressed.connect(func() -> void: get_tree().quit())
+	buttons.add_child(quit)
+	$UI.add_child(_result)
+
+
+func _play_again() -> void:
+	GameClock.day = 1
+	GameClock.hour = 6
+	GameClock.minute = 0
+	GameClock.time_scale = 1.0
+	GameState.new_run()
+	get_tree().reload_current_scene()
+
+
+func _on_morale_changed(_v: float) -> void:
+	_refresh_status()

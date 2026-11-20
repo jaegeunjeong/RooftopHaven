@@ -27,6 +27,24 @@
 			0
 		]
 	],
+	"prototype_grades": [
+		[
+			"S",
+			6000
+		],
+		[
+			"A",
+			5000
+		],
+		[
+			"B",
+			3500
+		],
+		[
+			"C",
+			0
+		]
+	],
 	"prototype_note": "체험판·프로토타입(10일)은 같은 식에 날 수만 10일로 계산한다",
 	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."
 }

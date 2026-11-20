@@ -20,6 +20,8 @@ func _ready() -> void:
 	_test_raids()
 	_test_new_building()
 	_test_night_rules()
+	_test_radio()
+	_test_floor_and_score()
 	_test_scripted_player()
 	print("TESTS: %s (%d failed)" % ["PASS" if _fails == 0 else "FAIL", _fails])
 	get_tree().quit(1 if _fails > 0 else 0)
@@ -287,11 +289,15 @@ func _test_scripted_player() -> void:
 	var outcomes := {}
 	var wake := func(_i: Dictionary) -> void: GameState.raids.wake_all()
 	GameState.raid_warning.connect(wake)
+	var no_answer := func(_p: Dictionary) -> void: GameState.radio.expire.call_deferred()
+	GameState.radio_asked.connect(no_answer)
 	for seed_value in range(100, 130):
 		_reset(seed_value)
 		while not GameState.ended:
 			if GameClock.minute == 0:
 				_bot_turn()
+			if not GameState.radio.pending.is_empty():
+				GameState.radio.expire()
 			GameClock._advance_minute()
 		if GameState.result == &"rescued":
 			stats["wins"] += 1
@@ -305,6 +311,7 @@ func _test_scripted_player() -> void:
 			if not GameData.facility(fid).get("built_at_start", false):
 				stats["built"] += int(GameState.built[fid])
 	GameState.raid_warning.disconnect(wake)
+	GameState.radio_asked.disconnect(no_answer)
 	print("    wins %d/30, deaths %d, raids %d %s, facilities standing at the end %.1f/run, broken %d, storeroom raided %d" % [
 			stats["wins"], stats["deaths"], stats["raids"], str(outcomes), stats["built"] / 30.0, stats["broken"], stats["lost"]])
 	_check(stats["wins"] >= 12, "a plain strategy survives at least 12 of 30 runs (%d)" % stats["wins"])
@@ -414,3 +421,72 @@ func _test_night_rules() -> void:
 	_check(GameState.raids.warning_minutes() == 60, "a guard hears them 1h ahead")
 	GameState.built["watch_post"] = 1
 	_check(GameState.raids.warning_minutes() == 120, "a watch post makes it 2h")
+
+
+func _test_radio() -> void:
+	print("radio events")
+	_reset(51)
+	GameState.expeditions.dispatch("clothing_mall", [2])
+	_check(GameState.expeditions.active[0]["events_at"].is_empty(), "no radio events before day 6")
+	GameState.expeditions.active.clear()
+	GameState._survivor(2).at_base = true
+	GameState._survivor(2).expedition_id = 0
+	GameState._survivor(2).activity = Survivor.Activity.REST
+	GameClock.day = 6
+	GameState.add_item("crowbar", 1)
+	GameState.expeditions.dispatch("clothing_mall", [2, 3])
+	var e: Dictionary = GameState.expeditions.active[0]
+	_check(e["events_at"].size() >= 1, "day 6: at least one radio event scheduled (%d)" % e["events_at"].size())
+	var got := {"p": {}}
+	var on_ask := func(p: Dictionary) -> void: got["p"] = p
+	GameState.radio_asked.connect(on_ask)
+	GameState.radio.trigger(e, "cache")
+	GameState.radio_asked.disconnect(on_ask)
+	var ids: Array = []
+	for c: Dictionary in got["p"].get("choices", []):
+		ids.append(c["id"])
+	_check(ids.has("cache_crowbar"), "crowbar choice shows when the team carries a crowbar (%s)" % str(ids))
+	var crow: Dictionary = {}
+	for c: Dictionary in GameData.events["cache"]["choices"]:
+		if c["id"] == "cache_crowbar":
+			crow = c
+	_check(is_equal_approx(GameState.radio.chance(crow, e), 0.90), "crowbar chance: 80 + 2-person team 5 + day 6~10 5 = 90%% (%.2f)" % GameState.radio.chance(crow, e))
+	var trace := GameState.trace
+	GameState.radio.expire()
+	_check(GameState.radio.pending.is_empty(), "no answer: the default choice was taken")
+	_check(e["log"].size() == 1 and e["log"][0]["choice"] == "cache_skip", "default was 'move on'")
+	_check(is_equal_approx(GameState.trace, trace), "moving on leaves no trace")
+	GameState.radio.trigger(e, "horde")
+	var total := float(e["total"])
+	GameState.radio.answer("horde_hide")
+	_check(float(e["total"]) >= total + 60.0, "hiding adds time to the trip")
+	_check(GameState.radio.pending.is_empty(), "card closed after answering")
+	# the event log ends up in the return report
+	var rep := {"r": {}}
+	var on_back := func(r: Dictionary) -> void: rep["r"] = r
+	GameState.expedition_returned.connect(on_back)
+	_run_minutes(14 * 60)
+	GameState.expedition_returned.disconnect(on_back)
+	_check(rep["r"].get("radio", []).size() >= 2, "radio choices are listed in the return report")
+
+
+func _test_floor_and_score() -> void:
+	print("floor sleeping and score")
+	_reset(52)
+	_check(GameState.floor_sleepers() == 3, "no beds: three sleep on the floor")
+	var m := GameState.morale
+	GameClock.day = 2
+	GameState.morning()
+	_check(GameState.morale <= m - 2.0, "2+ on the floor: morale -2 (%.0f -> %.0f)" % [m, GameState.morale])
+	GameState.built["bed"] = 2
+	_check(GameState.floor_sleepers() == 1, "two beds: one on the floor")
+	m = GameState.morale
+	GameState.morning()
+	_check(GameState.morale >= m - 0.01 or GameState.foods_today.size() > 0, "only one on the floor: no penalty")
+	GameState.result = &"rescued"
+	var rows := GameState.score_breakdown()
+	var total := 0
+	for row: Array in rows:
+		total += int(row[2])
+	_check(total == GameState.compute_score() and rows.size() >= 4, "score breakdown adds up (%d)" % total)
+	_check(GameState.grade(6000) == "S" and GameState.grade(3600) == "B", "prototype grades")
