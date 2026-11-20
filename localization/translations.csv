@@ -202,3 +202,49 @@ REPORT_LOST,Lost from the storeroom,창고에서 잃은 것
 HM_M,{m}m,{m}분
 HM_H,{h}h,{h}시간
 HM_HM,{h}h {m}m,{h}시간 {m}분
+ITEM_TORCH,Torch,횃불
+ITEM_METAL_PLATE,Metal plate,철판
+ITEM_JERKY,Smoked jerky,훈제 육포
+ITEM_SPIKE_TRAP,Spike trap,가시 함정
+FAC_CAMPFIRE,Campfire,모닥불
+FAC_WATCH_POST,Watch post,감시 초소
+FAC_RAIN_COLLECTOR_2,Rain collector Lv2,빗물 집수기 Lv2
+FAC_WORK_LAMP,Work lamp,작업등
+FAC_REINFORCED_DOOR,Reinforced door,보강 문
+FAC_SMOKER,Smoker,훈연기
+FAC_INFIRMARY_BED,Infirmary bed,의무실 침상
+FAC_WORKBENCH_2,Workbench Lv2,작업대 Lv2
+FAC_BARBED_WIRE,Barbed wire,철조망
+FAC_WATCHTOWER,Watchtower,감시탑
+RECIPE_JERKY_VEG,Smoked veggies,훈제 채소
+RECIPE_SALVAGE,Salvage debris,잔해 해체
+LOC_HARDWARE_STORE,Hardware store,철물점
+REASON_NEED_BLUEPRINT,Needs a blueprint (find one on expeditions),설계도 필요 (원정에서 찾기)
+REASON_BUILT_MAX,Already built,이미 지음
+REASON_SALVAGE_DONE,Done for today (3 a day),오늘은 다 뜯음 (하루 3번)
+REASON_NOT_YET,Opens on day 6,6일째부터 갈 수 있음
+WARN_NO_LIGHT,No light for night work (campfire needs fuel or wood),밤 작업용 불빛이 없다 (모닥불은 연료나 목재 필요)
+WARN_LIT,{item} is lit for night work,{item}을(를) 켜고 밤 작업을 한다
+WARN_SALVAGED,{name} salvaged {item},{name}이(가) 잔해에서 {item}을(를) 얻었다
+WARN_BLUEPRINT,Found a blueprint: {item},설계도 발견: {item}
+WARN_RAID_HEARD_INFECTED,On watch: moaning in the distance. The infected are coming,경비: 멀리서 신음 소리. 감염체가 온다
+WARN_RAID_HEARD_RAIDERS,On watch: footsteps and voices. Raiders are coming,경비: 발소리와 말소리. 약탈자가 온다
+WARN_WOKE_ALL,Everyone is up and ready,모두 깨어 습격에 대비한다
+UPGRADE,upgrade,업그레이드
+NIGHT_WORK,Light up and keep working until 02:00,불을 켜고 02시까지 작업
+NIGHT_WORK_INFO,Light: {src} · trace +1 a night,불빛: {src} · 밤마다 흔적 +1
+NIGHT_WORK_NONE,Build a campfire or work lamp to work at night,밤 작업은 모닥불이나 작업등이 있어야 함
+NIGHT_RAIDERS,Raiders may come for the storeroom (from day 8),약탈자가 창고를 노리고 올 수 있다 (8일째부터)
+ALERT_TITLE_INFECTED,The infected are coming! About {m} away,감염체가 온다! 약 {m} 뒤
+ALERT_TITLE_RAIDERS,Raiders are coming! About {m} away,약탈자가 온다! 약 {m} 뒤
+ALERT_INFO,Defense now {d}. Wake everyone to fight (they lose sleep).,지금 방어력 {d}. 모두 깨우면 함께 싸우지만 잠을 못 잔다.
+ALERT_WAKE,Wake everyone,모두 깨우기
+ALERT_LET,Let them sleep,그냥 둔다
+EXP_NIGHT,"{h} of it at night: injury up to x2, slower, finds +30%{torch}","그중 밤 {h}: 부상 최대 2배, 느려짐, 수확 +30%{torch}"
+EXP_TORCH, (torch halves the risk), (횃불이 위험을 절반으로)
+REPORT_NIGHT,Out at night: {p}% of the trip,밤에 다닌 시간: {p}%
+REPORT_BLUEPRINT,Blueprint found: {item},설계도 발견: {item}
+REPORT_RAIDERS,Raiders,약탈자
+REPORT_INFECTED,Infected,감염체
+REPORT_TRAP,A spike trap took the edge off (-2),가시 함정이 힘을 뺐다 (-2)
+SALVAGE_INFO,"wood, scrap, cloth or plastic (needs a hammer)",목재·고철·천·플라스틱 중 하나 (망치 필요)

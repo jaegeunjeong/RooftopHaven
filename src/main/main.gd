@@ -47,6 +47,8 @@ var _night_info: Label
 var _popup: PanelContainer
 var _popup_label: Label
 var _reports: Array[Dictionary] = []
+var _alert: PanelContainer
+var _alert_label: Label
 
 
 func _ready() -> void:
@@ -69,6 +71,7 @@ func _ready() -> void:
 	GameState.run_ended.connect(_on_run_ended)
 	GameState.expedition_returned.connect(_on_report)
 	GameState.raid_resolved.connect(_on_report)
+	GameState.raid_warning.connect(_on_raid_warning)
 	GameState.night_changed.connect(_refresh_night)
 	GameState.expeditions.changed.connect(_update_exp_progress)
 	_on_minute_changed(GameClock.day, GameClock.hour, GameClock.minute)
@@ -176,6 +179,39 @@ func _build_ui() -> void:
 	pv.add_child(ok)
 	_popup.visible = false
 	ui.add_child(_popup)
+
+	_alert = PanelContainer.new()
+	_alert.theme = _theme
+	_alert.position = Vector2(110, 60)
+	_alert.custom_minimum_size = Vector2(300, 0)
+	var a_style := StyleBoxFlat.new()
+	a_style.bg_color = Color(0.20, 0.07, 0.06, 0.97)
+	a_style.border_color = Color(0.95, 0.40, 0.30)
+	a_style.set_border_width_all(2)
+	a_style.set_content_margin_all(8)
+	_alert.add_theme_stylebox_override("panel", a_style)
+	_alert.z_index = 30
+	var av := VBoxContainer.new()
+	_alert.add_child(av)
+	_alert_label = Label.new()
+	_alert_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_alert_label.custom_minimum_size = Vector2(284, 0)
+	av.add_child(_alert_label)
+	var ab := HBoxContainer.new()
+	av.add_child(ab)
+	var wake := Button.new()
+	wake.text = tr("ALERT_WAKE")
+	wake.pressed.connect(func() -> void:
+		GameState.raids.wake_all()
+		_alert.visible = false
+		_refresh_night())
+	ab.add_child(wake)
+	var let := Button.new()
+	let.text = tr("ALERT_LET")
+	let.pressed.connect(func() -> void: _alert.visible = false)
+	ab.add_child(let)
+	_alert.visible = false
+	ui.add_child(_alert)
 
 
 func _make_base_tab() -> Control:
@@ -326,15 +362,31 @@ func _refresh_build() -> void:
 				("" if reqs == "" else " · " + tr("NEEDS") + " " + reqs)]
 		var have := int(GameState.built.get(fid, 0))
 		var title := GameData.display_name(f) + ("" if have == 0 else "  (%s %d)" % [tr("BUILT"), have])
-		_add_row(_build_list, title, detail, GameState.build_blocker(fid), func() -> void: GameState.queue_build(fid))
+		if f.has("upgrade_of"):
+			title += "  ↑" + tr("UPGRADE")
+		var blocker := GameState.build_blocker(fid)
+		if blocker == "REASON_BUILT_MAX" and have > 0:
+			continue  # already have the one we can have
+		_add_row(_build_list, title, detail, blocker, func() -> void: GameState.queue_build(fid))
 
 
 func _refresh_craft() -> void:
 	for c in _craft_list.get_children():
 		c.queue_free()
-	for station: String in ["workbench", "stove"]:
+	var stations: Array[String] = []
+	for fid: String in GameData.facilities:
+		var st := String(GameData.facility(fid).get("effects", {}).get("station", ""))
+		if st != "" and not stations.has(st):
+			stations.append(st)
+	for station: String in stations:
+		var owner := ""
+		for fid: String in GameData.facilities:
+			if GameData.facility(fid).get("effects", {}).get("station", "") == station:
+				owner = fid
+		if not GameState._has_station(station) and station not in ["workbench", "stove"]:
+			continue  # show a station's recipes once it is built
 		var head := Label.new()
-		head.text = "— %s —" % GameData.display_name(GameData.facility(station))
+		head.text = "— %s —" % GameData.display_name(GameData.facility(owner))
 		head.add_theme_color_override("font_color", MUTED)
 		_craft_list.add_child(head)
 		for rid: String in GameData.recipes:
@@ -349,8 +401,12 @@ func _refresh_craft() -> void:
 			var mins := float(r.get("minutes", 30))
 			var detail := "%s · %s" % [inputs, tr("MINUTES_FMT").format({"m": int(mins), "real": _real_time(mins)})]
 			var title := GameData.display_name(r)
-			var out_id: String = Dictionary(r.get("output", {})).keys()[0]
-			if GameState.count(out_id) > 0:
+			var outs: Array = Dictionary(r.get("output", {})).keys()
+			var out_id: String = outs[0] if not outs.is_empty() else ""
+			if r.has("salvage"):
+				detail = "%s · %s · %d/%d" % [tr("SALVAGE_INFO"), tr("MINUTES_FMT").format({"m": int(mins), "real": _real_time(mins)}),
+						GameState.salvage_today, int(r["salvage"]["per_day"])]
+			if out_id != "" and GameState.count(out_id) > 0:
 				title += "  (%s %d)" % [tr("HAVE"), GameState.count(out_id)]
 			_add_row(_craft_list, title, detail, GameState.craft_blocker(rid), func() -> void: GameState.queue_craft(rid))
 
@@ -411,7 +467,7 @@ func _add_row(list: VBoxContainer, title: String, detail: String, blocker: Strin
 	list.add_child(row)
 	var b := Button.new()
 	b.text = title
-	b.custom_minimum_size = Vector2(118, 0)
+	b.custom_minimum_size = Vector2(134, 0)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
 	b.disabled = blocker != ""
@@ -419,7 +475,7 @@ func _add_row(list: VBoxContainer, title: String, detail: String, blocker: Strin
 	row.add_child(b)
 	var info := Label.new()
 	info.text = detail if blocker == "" else detail + "\n" + _reason_text(blocker)
-	info.custom_minimum_size = Vector2(240, 0)
+	info.custom_minimum_size = Vector2(226, 0)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_theme_color_override("font_color", MUTED if blocker == "" else BAD)
 	row.add_child(info)
@@ -539,9 +595,13 @@ func _refresh_expedition() -> void:
 			_refresh_expedition())
 		row.add_child(b)
 		var team: Array = picked if not picked.is_empty() else [GameState.survivors[1]]
-		var mins := X.trip_minutes(lid, team)
-		var inj := X.injury_chance(lid, team, X.pick_gear(team)) * 100.0
+		var gear_preview := X.pick_gear(team, lid)
+		var est: Dictionary = X.estimate_trip(lid, team, int(gear_preview.get("torch", 0)) > 0)
+		var mins := float(est["real"])
+		var inj := X.injury_chance(lid, team, gear_preview) * 100.0
 		var back_min := GameClock.hour * 60 + GameClock.minute + int(mins)
+		var locked := GameClock.day < int(loc.get("from_day", 1))
+		b.disabled = locked
 		var info := Label.new()
 		var loot: PackedStringArray = []
 		for id: String in loc["loot"]:
@@ -551,6 +611,11 @@ func _refresh_expedition() -> void:
 				tr("EXP_INFO").format({"hours": _hm(mins), "real": _real_time(mins), "inj": int(round(inj)),
 						"back": "%02d:%02d" % [(back_min / 60) % 24, back_min % 60]}),
 				tr("EXP_LOOT"), ", ".join(loot), tr("EXP_STOCK").format({"p": int(round(X.stock_of(lid) * 100))})]
+		if float(est["night"]) > 0.0:
+			info.text += "\n" + tr("EXP_NIGHT").format({"h": _hm(float(est["night"])),
+					"torch": tr("EXP_TORCH") if int(gear_preview.get("torch", 0)) > 0 else ""})
+		if locked:
+			info.text = tr("REASON_NOT_YET") + "\n" + info.text
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.custom_minimum_size = Vector2(260, 0)
 		info.add_theme_color_override("font_color", MUTED)
@@ -574,7 +639,7 @@ func _refresh_expedition() -> void:
 	var ids: Array = []
 	for s in picked:
 		ids.append(s.id)
-	var gear := X.pick_gear(picked)
+	var gear := X.pick_gear(picked, _exp_place)
 	var gear_text: PackedStringArray = []
 	for id: String in gear:
 		gear_text.append("%s %d" % [_thing_name(id), int(gear[id])])
@@ -620,7 +685,9 @@ func _refresh_night() -> void:
 	_night_box.add_child(_night_info)
 	var alarm := int(GameState.built.get("can_alarm", 0)) > 0
 	_muted(_night_box, tr("NIGHT_ALARM") if alarm else tr("NIGHT_NO_ALARM"))
-	if not alarm:
+	if GameClock.day >= 7:
+		_muted(_night_box, tr("NIGHT_RAIDERS"))
+	if true:
 		var row := HBoxContainer.new()
 		_night_box.add_child(row)
 		var l := Label.new()
@@ -636,6 +703,14 @@ func _refresh_night() -> void:
 			var sid := s.id
 			cb.toggled.connect(func(on: bool) -> void: GameState.set_guard(GameState._survivor(sid), on))
 			row.add_child(cb)
+	var nw := CheckBox.new()
+	nw.text = tr("NIGHT_WORK")
+	nw.button_pressed = GameState.night_work
+	var src := GameState.light_source()
+	nw.disabled = src == "" and not GameState.night_work
+	nw.toggled.connect(func(on: bool) -> void: GameState.set_night_work(on))
+	_night_box.add_child(nw)
+	_muted(_night_box, tr("NIGHT_WORK_NONE") if src == "" else tr("NIGHT_WORK_INFO").format({"src": _thing_name(src)}))
 	_refresh_night_info()
 
 
@@ -669,10 +744,17 @@ func _show_next_report() -> void:
 			loot.append("%s %d" % [_thing_name(id), int(r["loot"][id])])
 		lines.append("%s: %s" % [tr("REPORT_LOOT"), ", ".join(loot) if not loot.is_empty() else tr("REPORT_NOTHING")])
 		lines.append("%s: %s" % [tr("REPORT_INJURIES"), _injury_text(r["injuries"])])
+		if r.has("blueprint"):
+			lines.append(tr("REPORT_BLUEPRINT").format({"item": _thing_name(String(r["blueprint"]))}))
+		if float(r.get("night", 0.0)) > 0.0:
+			lines.append(tr("REPORT_NIGHT").format({"p": int(round(float(r["night"]) * 100))}))
 		if int(r.get("trace", 0)) > 0:
 			lines.append(tr("REPORT_TRACE"))
 	else:
-		lines.append("%s — %s" % [tr("REPORT_RAID_TITLE"), tr("RAID_" + String(r["result"]).to_upper())])
+		lines.append("%s (%s) — %s" % [tr("REPORT_RAID_TITLE"), tr("REPORT_" + String(r.get("enemy", "infected")).to_upper()),
+				tr("RAID_" + String(r["result"]).to_upper())])
+		if r.get("trap", false):
+			lines.append(tr("REPORT_TRAP"))
 		lines.append(tr("REPORT_RAID_LINE").format({"st": r["strength"], "d": r["defense"], "g": r["guards"]}))
 		lines.append("%s: %s" % [tr("REPORT_INJURIES"), _injury_text(r["injuries"])])
 		if not r["broken"].is_empty():
@@ -733,3 +815,11 @@ func _hm(game_minutes: float) -> String:
 	if r == 0:
 		return tr("HM_H").format({"h": h})
 	return tr("HM_HM").format({"h": h, "m": r})
+
+
+func _on_raid_warning(info: Dictionary) -> void:
+	var kind := String(info.get("kind", "infected")).to_upper()
+	_alert_label.text = "%s\n%s" % [tr("ALERT_TITLE_" + kind).format({"m": _hm(float(info.get("minutes", 60)))}),
+			tr("ALERT_INFO").format({"d": GameState.raids.defense()})]
+	_alert.visible = true
+	_alert.reset_size()

@@ -16,6 +16,7 @@ signal built_changed
 signal expedition_returned(report: Dictionary)
 signal raid_resolved(report: Dictionary)
 signal night_changed
+signal raid_warning(info: Dictionary)
 
 const MIN_PER_HOUR := 60.0
 
@@ -25,6 +26,10 @@ var raw_food: Array[Dictionary] = []    # {item, day} batches of anything that s
 var durability: Dictionary = {}         # item id -> remaining uses, pooled over all copies
 var tasks: Array[Dictionary] = []       # work queue, see queue_build() / queue_craft()
 var cooks_today: int = 0
+var blueprints: Dictionary = {}         # facility id -> true once found
+var salvage_today: int = 0
+var night_work: bool = false            # light up and keep working until 02:00
+var lit_tonight: bool = false
 var built: Dictionary = {}              # facility id -> count
 var morale: float = 60.0
 var morale_zero_minutes: int = 0
@@ -51,6 +56,7 @@ func _init() -> void:
 	expeditions.returned.connect(func(r: Dictionary) -> void: expedition_returned.emit(r))
 	raids.resolved.connect(func(r: Dictionary) -> void: raid_resolved.emit(r))
 	raids.changed.connect(func() -> void: night_changed.emit())
+	raids.warning.connect(func(i: Dictionary) -> void: raid_warning.emit(i))
 
 
 func _ready() -> void:
@@ -82,6 +88,10 @@ func new_run(seed_value: int = 0) -> void:
 	durability.clear()
 	tasks.clear()
 	cooks_today = 0
+	blueprints.clear()
+	salvage_today = 0
+	night_work = false
+	lit_tonight = false
 	for k: String in inventory:
 		_add_durability(k, count(k))
 	built.clear()
@@ -237,6 +247,10 @@ func build_blocker(fid: String) -> String:
 	var f: Dictionary = GameData.facility(fid)
 	if f.is_empty() or f.get("built_at_start", false):
 		return "REASON_NOT_BUILDABLE"
+	if f.has("max_count") and int(built.get(fid, 0)) + _queued(fid) >= int(f["max_count"]):
+		return "REASON_BUILT_MAX"
+	if f.get("blueprint", false) and not blueprints.has(fid):
+		return "REASON_NEED_BLUEPRINT"
 	for req: String in f.get("requires", []):
 		if GameData.items.has(req) and count(req) <= 0:
 			return "REASON_NEED_TOOL:" + req
@@ -254,12 +268,56 @@ func craft_blocker(rid: String) -> String:
 		return "REASON_NEED_STATION:" + station
 	if r.has("uses_durability") and count(String(r["uses_durability"])) <= 0:
 		return "REASON_NEED_TOOL:" + String(r["uses_durability"])
+	if r.has("salvage") and salvage_today + _queued(rid) >= int(r["salvage"]["per_day"]):
+		return "REASON_SALVAGE_DONE"
+	if r.has("salvage") and count("hammer") <= 0:
+		return "REASON_NEED_TOOL:hammer"
 	var m := _missing(r.get("inputs", {}))
 	if m != "":
 		return m
 	if int(r.get("fuel", 0)) > 0 and count("fuel") + count("wood") < int(r["fuel"]):
 		return "REASON_NEED_FUEL"
 	return ""
+
+
+func _queued(id: String) -> int:
+	var n := 0
+	for t in tasks:
+		if t["id"] == id:
+			n += 1
+	return n
+
+
+## A light source for night work: the work lamp is free, the campfire burns one fuel or wood a night.
+func light_source() -> String:
+	for fid: String in ["work_lamp", "campfire"]:
+		if int(built.get(fid, 0)) > 0:
+			if fid == "campfire" and count("fuel") + count("wood") <= 0:
+				continue
+			return fid
+	return ""
+
+
+func set_night_work(on: bool) -> void:
+	night_work = on
+	night_changed.emit()
+
+
+## 22:00: light up for night work (costs trace and maybe fuel), before the raid roll.
+func _light_up() -> void:
+	lit_tonight = false
+	if not night_work:
+		return
+	var src := light_source()
+	if src == "":
+		_warn("WARN_NO_LIGHT", null)
+		return
+	var eff: Dictionary = GameData.facility(src).get("effects", {})
+	if int(eff.get("fuel_per_night", 0)) > 0:
+		take_item("fuel" if count("fuel") > 0 else "wood", int(eff["fuel_per_night"]))
+	trace += float(eff.get("trace_per_night", 1))
+	lit_tonight = true
+	_warn("WARN_LIT", null, {"item": GameData.display_name(GameData.facility(src))})
 
 
 func _has_station(station: String) -> bool:
@@ -349,6 +407,8 @@ func _can_work(s: Survivor) -> bool:
 	var auto: Dictionary = GameData.config["auto"]
 	var hour := GameClock.hour
 	var night := hour >= int(auto["sleep_from_hour"]) or hour < int(auto["wake_hour"])
+	if night and lit_tonight and (hour >= int(auto["sleep_from_hour"]) or hour < int(GameData.night["night_work"]["until_hour"])):
+		night = false  # working by the light
 	return s.is_active() and s.at_base and not night and s.forced_sleep_minutes <= 0 \
 			and s.stamina >= float(auto["sleep_if_stamina_below"]) \
 			and s.health >= float(GameData.config["stats"]["bands"]["caution"]) \
@@ -434,6 +494,13 @@ func _finish_task(t: Dictionary) -> void:
 	else:
 		var r: Dictionary = GameData.recipes[t["id"]]
 		var out: Dictionary = r.get("output", {})
+		if r.has("salvage"):
+			out = {_salvage_roll(r["salvage"]): 1}
+			salvage_today += 1
+			if salvage_today == 1:
+				trace += float(r["salvage"].get("trace_first", 1))
+			wear("hammer")
+			t["salvaged"] = out.keys()[0]
 		for id: String in out:
 			add_item(id, int(out[id]))
 		if r.has("uses_durability"):
@@ -442,7 +509,10 @@ func _finish_task(t: Dictionary) -> void:
 			cooks_today += 1
 			if cooks_today == 3:
 				trace += float(GameData.night["trace"]["sources"]["cooks_3_per_day"])
-		_warn("WARN_CRAFTED", worker, {"item": task_name(t)})
+		if t.has("salvaged"):
+			_warn("WARN_SALVAGED", worker, {"item": GameData.display_name(GameData.item(t["salvaged"]))})
+		else:
+			_warn("WARN_CRAFTED", worker, {"item": task_name(t)})
 	# small chance of hurting yourself while working
 	if worker and worker.injury == "":
 		var b: Dictionary = GameData.config["build"]
@@ -453,6 +523,19 @@ func _finish_task(t: Dictionary) -> void:
 			worker.injury = "light"
 			change_morale(float(GameData.config["morale"]["daily"]["injury"]))
 			_warn("WARN_ACCIDENT", worker)
+
+
+func _salvage_roll(cfg: Dictionary) -> String:
+	var w: Dictionary = cfg["weights"]
+	var total := 0
+	for k: String in w:
+		total += int(w[k])
+	var roll := _rng.randi_range(1, total)
+	for k: String in w:
+		roll -= int(w[k])
+		if roll <= 0:
+			return k
+	return String(w.keys()[0])
 
 
 func _survivor(sid: int) -> Survivor:
@@ -558,6 +641,8 @@ func advance_minute() -> void:
 			_collapse(s)
 	_progress_work()
 	expeditions.tick()
+	if GameClock.hour == int(GameData.night.get("raid_check_hour", 22)) and GameClock.minute == 0:
+		_light_up()
 	raids.tick()
 	_tick_morale()
 	_check_end()
@@ -675,6 +760,8 @@ func _tick_injury(s: Survivor) -> void:
 	if s.injury == "":
 		return
 	s.injury_minutes += 1
+	if s.at_base and s.injury != "infected" and int(built.get("infirmary_bed", 0)) > 0:
+		s.injury_minutes += int(GameData.facility("infirmary_bed")["effects"].get("heal_speed", 2.0)) - 1
 	var inj: Dictionary = GameData.injuries
 	if s.injury_minutes % 60 == 0:
 		_treat(s)
@@ -790,11 +877,15 @@ func morning() -> void:
 	var cfg: Dictionary = GameData.config
 	var day := GameClock.day
 	var rain := weather_today() == "rain"
-	# rain collector
-	var collector: Dictionary = GameData.facility("rain_collector").get("effects", {})
-	var daily: Dictionary = collector.get("daily_rain" if rain else "daily", {})
-	for id: String in daily:
-		add_item(id, int(daily[id]) * int(built.get("rain_collector", 0)))
+	# rain collectors (Lv2 adds on top)
+	for fid: String in built:
+		var eff: Dictionary = GameData.facility(fid).get("effects", {})
+		var daily: Dictionary = eff.get("daily_rain" if rain else "daily", {})
+		for id: String in daily:
+			add_item(id, int(daily[id]) * int(built[fid]))
+	salvage_today = 0
+	lit_tonight = false
+	raids.morning()
 	# spoilage
 	var kept: Array[Dictionary] = []
 	var spoiled := 0

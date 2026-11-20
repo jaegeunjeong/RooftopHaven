@@ -18,6 +18,8 @@ func _ready() -> void:
 	_test_recall_and_rules()
 	_test_injuries()
 	_test_raids()
+	_test_new_building()
+	_test_night_rules()
 	_test_scripted_player()
 	print("TESTS: %s (%d failed)" % ["PASS" if _fails == 0 else "FAIL", _fails])
 	get_tree().quit(1 if _fails > 0 else 0)
@@ -101,6 +103,13 @@ func _test_full_run_rescued() -> void:
 	_reset(13)
 	GameState.add_item("canned_food", 60)
 	GameState.add_item("bottled_water", 90)
+	# nights are dangerous now: give the base a few defenses
+	for fid: String in ["barricade", "barricade", "can_alarm", "watch_post", "reinforced_door"]:
+		GameState.built[fid] = int(GameState.built.get(fid, 0)) + 1
+		GameState.raids.on_built(fid)
+	GameState.add_item("iron_pipe", 3)
+	GameState.add_item("bandage", 6)
+	GameState.add_item("splint", 3)
 	_run_minutes(10 * 24 * 60)
 	_check(GameState.ended and GameState.result == &"rescued", "rescued by the helicopter (result=%s)" % GameState.result)
 	var sc := GameState.compute_score()
@@ -240,9 +249,10 @@ func _test_raids() -> void:
 	print("night raids")
 	_reset(34)
 	var R: Raids = GameState.raids
-	_check(R.chance_tonight() == 0.0, "no trace on day 1: no raid chance")
+	var rain_mult := 0.5 if GameState.weather_today() == "rain" else 1.0
+	_check(is_equal_approx(R.chance_tonight(), 0.2 * rain_mult), "day 1 base chance 20%% (%.2f)" % R.chance_tonight())
 	GameState.trace = 6
-	_check(is_equal_approx(R.chance_tonight(), 0.3) or GameState.weather_today() == "rain", "trace 6 -> 30%% chance (%.2f)" % R.chance_tonight())
+	_check(is_equal_approx(R.chance_tonight(), 0.5 * rain_mult), "trace 6 adds 30%% (%.2f)" % R.chance_tonight())
 	_check(R.strength_tonight() == 3, "day 1 strength 2 + 1 for 5 trace (%d)" % R.strength_tonight())
 	_check(R.defense() == 0, "nobody on watch and no barricade: defense 0")
 	GameState.set_guard(GameState.survivors[0], true)
@@ -272,47 +282,55 @@ func _test_raids() -> void:
 
 ## A simple scripted player over many seeds: does a 10-day run work end to end?
 func _test_scripted_player() -> void:
-	print("scripted player, 20 runs")
-	var wins := 0
-	var deaths := 0
-	var raids := 0
+	print("scripted player, 30 runs")
+	var stats := {"wins": 0, "deaths": 0, "raids": 0, "built": 0, "lost": 0, "broken": 0}
 	var outcomes := {}
-	var low_food := 0
-	for seed_value in range(100, 120):
+	var wake := func(_i: Dictionary) -> void: GameState.raids.wake_all()
+	GameState.raid_warning.connect(wake)
+	for seed_value in range(100, 130):
 		_reset(seed_value)
 		while not GameState.ended:
 			if GameClock.minute == 0:
 				_bot_turn()
 			GameClock._advance_minute()
 		if GameState.result == &"rescued":
-			wins += 1
-		deaths += GameState.deaths
-		raids += GameState.raids.history.size()
+			stats["wins"] += 1
+		stats["deaths"] += GameState.deaths
+		stats["raids"] += GameState.raids.history.size()
 		for r: Dictionary in GameState.raids.history:
 			outcomes[r["result"]] = int(outcomes.get(r["result"], 0)) + 1
-	print("    wins %d/20, deaths %d, raids %d %s" % [wins, deaths, raids, str(outcomes)])
-	_check(wins >= 8, "a plain strategy survives at least 8 of 20 runs (%d)" % wins)
+			stats["broken"] += r["broken"].size()
+			stats["lost"] += 1 if not r["lost"].is_empty() else 0
+		for fid: String in GameState.built:
+			if not GameData.facility(fid).get("built_at_start", false):
+				stats["built"] += int(GameState.built[fid])
+	GameState.raid_warning.disconnect(wake)
+	print("    wins %d/30, deaths %d, raids %d %s, facilities standing at the end %.1f/run, broken %d, storeroom raided %d" % [
+			stats["wins"], stats["deaths"], stats["raids"], str(outcomes), stats["built"] / 30.0, stats["broken"], stats["lost"]])
+	_check(stats["wins"] >= 12, "a plain strategy survives at least 12 of 30 runs (%d)" % stats["wins"])
 
 
 func _bot_turn() -> void:
 	var gs := GameState
-	if gs.tasks.size() < 2:
-		for rid: String in ["hammer", "water_filter", "bandage", "iron_pipe", "rope", "splint", "heated_can", "meat_skewer"]:
-			if (rid in ["hammer", "water_filter", "iron_pipe"] and gs.count(rid) > 0) or (rid in ["bandage", "splint"] and gs.count(rid) >= 2):
+	var keep := {"bandage": 2, "splint": 1, "iron_pipe": 2, "rope": 1, "spike_trap": 1, "torch": 1}
+	if gs.tasks.size() < 3:
+		for rid: String in ["hammer", "water_filter", "bandage", "rope", "iron_pipe", "splint", "spike_trap", "torch", "heated_can", "meat_skewer", "jerky", "metal_plate", "salvage"]:
+			if rid in ["hammer", "water_filter"] and gs.count(rid) > 0:
 				continue
-			if rid == "rope" and gs.count("rope") >= 1:
+			if keep.has(rid) and gs.count(rid) >= int(keep[rid]):
+				continue
+			if rid == "metal_plate" and gs.count("metal_plate") >= 3:
+				continue
+			if gs._queued(rid) > 0 and rid != "salvage":
 				continue
 			if gs.queue_craft(rid):
 				break
-		for fid: String in ["stove", "barricade", "can_alarm", "bed", "nail_board", "barricade", "rat_trap", "bed"]:
+		for fid: String in ["stove", "barricade", "can_alarm", "watch_post", "rain_collector_2", "bed", "nail_board", "barricade",
+				"workbench_2", "reinforced_door", "barbed_wire", "watchtower", "rat_trap", "smoker", "infirmary_bed", "bed", "storage_shelf", "campfire"]:
 			var want := 2 if fid in ["barricade", "bed"] else 1
-			if int(gs.built.get(fid, 0)) >= want:
+			if int(gs.built.get(fid, 0)) + gs._queued(fid) >= want:
 				continue
-			var queued := false
-			for t in gs.tasks:
-				if t["id"] == fid:
-					queued = true
-			if not queued and gs.queue_build(fid):
+			if gs.queue_build(fid):
 				break
 	if gs.expeditions.active.is_empty() and GameClock.hour >= 6 and GameClock.hour <= 12 and GameClock.day < int(GameData.config["prototype"]["run_days"]):
 		var team := []
@@ -320,8 +338,79 @@ func _bot_turn() -> void:
 			if s.job != "mechanic" and gs.expeditions.member_blocker(s) == "" and s.food > 35 and s.water > 35:
 				team.append(s.id)
 		if not team.is_empty():
-			var place := "convenience_store" if gs.food_days() < 3.0 or gs.water_days() < 2.0 else "clothing_mall"
+			var place := "clothing_mall"
+			if gs.food_days() < 3.0 or gs.water_days() < 2.0:
+				place = "convenience_store"
+			elif GameClock.day >= 6 and gs.count("scrap") < 8:
+				place = "hardware_store"
 			gs.expeditions.dispatch(place, team)
-	# someone keeps watch until there is an alarm
 	for s in gs.survivors:
-		gs.set_guard(s, s.job == "mechanic" and int(gs.built.get("can_alarm", 0)) == 0)
+		if not gs.raids.all_awake:
+			gs.set_guard(s, s.job == "mechanic")
+
+
+func _test_new_building() -> void:
+	print("salvage, blueprints, upgrades")
+	_reset(41)
+	_check(GameState.craft_blocker("salvage").begins_with("REASON_NEED_TOOL:hammer"), "salvage needs a hammer")
+	GameState.add_item("hammer", 1)
+	for i in 3:
+		GameState.queue_craft("salvage")
+	_check(GameState.craft_blocker("salvage") == "REASON_SALVAGE_DONE", "three salvage jobs a day at most")
+	var before := 0
+	for id: String in ["wood", "scrap", "cloth", "plastic"]:
+		before += GameState.count(id)
+	_run_minutes(5 * 60)
+	var after := 0
+	for id: String in ["wood", "scrap", "cloth", "plastic"]:
+		after += GameState.count(id)
+	_check(after - before == 3, "three salvage jobs gave 3 materials (%d)" % (after - before))
+	_check(GameState.build_blocker("workbench_2") == "REASON_NEED_BLUEPRINT", "workbench Lv2 needs a blueprint")
+	GameState.blueprints["workbench_2"] = true
+	_check(GameState.build_blocker("workbench_2").begins_with("REASON_NEED_ITEM"), "with the blueprint only materials are missing")
+	_check(GameState.expeditions.dispatch_blocker("hardware_store", [2]) == "REASON_NOT_YET", "hardware store opens on day 6")
+	GameState.built["rain_collector_2"] = 1
+	var water := GameState.count("dirty_water")
+	GameClock.day = 2
+	GameClock.hour = 6
+	GameClock.minute = 0
+	GameState.morning()
+	var gain := GameState.count("dirty_water") - water
+	_check(gain == 10 or gain == 18, "rain collector Lv2 adds 4 (6 on rain): +%d" % gain)
+
+
+func _test_night_rules() -> void:
+	print("night expeditions and night work")
+	_reset(42)
+	var X: Expeditions = GameState.expeditions
+	var team: Array = [GameState.survivors[2]]
+	GameClock.hour = 18
+	var dusk: Dictionary = X.estimate_trip("convenience_store", team, false)
+	_check(dusk["night"] > 0.0, "an 18:00 trip runs into the night (%d min)" % int(dusk["night"]))
+	_check(dusk["real"] > 6 * 60, "night slows the team (%d min for a 6h trip)" % int(dusk["real"]))
+	var lit: Dictionary = X.estimate_trip("convenience_store", team, true)
+	_check(lit["real"] < dusk["real"], "a torch helps (%d min)" % int(lit["real"]))
+	GameClock.hour = 7
+	_check(X.estimate_trip("convenience_store", team, false)["night"] == 0.0, "a 07:00 trip stays in daylight")
+	# night work needs a light
+	GameState.set_night_work(true)
+	GameClock.hour = 21
+	GameClock.minute = 59
+	_run_minutes(2)
+	_check(not GameState.lit_tonight, "no light source: no night work")
+	GameState.built["work_lamp"] = 1
+	GameState.add_item("cloth", 10)
+	GameClock.day = 2
+	GameClock.hour = 21
+	GameClock.minute = 59
+	var trace_before := GameState.trace
+	_run_minutes(2)
+	_check(GameState.lit_tonight and GameState.trace > trace_before, "work lamp lit at 22:00, trace went up")
+	GameState.queue_craft("bandage")
+	_run_minutes(30)
+	_check(GameState.count("bandage") >= 1, "work goes on at night by the lamp")
+	# warnings: a guard hears raids coming
+	GameState.set_guard(GameState.survivors[0], true)
+	_check(GameState.raids.warning_minutes() == 60, "a guard hears them 1h ahead")
+	GameState.built["watch_post"] = 1
+	_check(GameState.raids.warning_minutes() == 120, "a watch post makes it 2h")

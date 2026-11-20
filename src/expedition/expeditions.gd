@@ -68,6 +68,8 @@ func member_blocker(s: Survivor) -> String:
 func dispatch_blocker(lid: String, ids: Array) -> String:
 	if not GameData.locations.has(lid):
 		return "REASON_NOT_BUILDABLE"
+	if GameClock.day < int(GameData.locations[lid].get("from_day", 1)):
+		return "REASON_NOT_YET"
 	if active.size() >= max_teams():
 		return "REASON_TEAM_LIMIT"
 	if ids.is_empty():
@@ -115,8 +117,10 @@ func injury_chance(lid: String, members: Array, gear: Dictionary = {}) -> float:
 
 ## What the team would take: one tool, one survival item and one piece of
 ## clothing each (best first), plus one ration and one bottle of water each.
-func pick_gear(members: Array) -> Dictionary:
+func pick_gear(members: Array, lid: String = "") -> Dictionary:
 	var gear: Dictionary = {}
+	if lid != "" and gs.count("torch") > 0 and estimate_trip(lid, members, false)["night"] > 0.0:
+		gear["torch"] = 1
 	var rain: bool = gs.weather_today() == "rain"
 	var clothing: Array = (["poncho"] + CLOTHING_PRIORITY) if rain else CLOTHING_PRIORITY + ["poncho"]
 	for i in members.size():
@@ -137,6 +141,40 @@ func pick_gear(members: Array) -> Dictionary:
 	return gear
 
 
+## Night rules for expeditions (22:00-06:00 out there): slower, more
+## dangerous, but more to find. A torch halves the downsides.
+func night_rules() -> Dictionary:
+	return rules().get("night", {})
+
+
+func is_night_hour(hour: int) -> bool:
+	var n := night_rules()
+	return hour >= int(n.get("from_hour", 22)) or hour < int(n.get("to_hour", 6))
+
+
+func travel_rate(has_torch: bool) -> float:
+	var slow := float(night_rules().get("travel_mult", 1.25)) - 1.0
+	if has_torch:
+		slow *= float(GameData.item("torch").get("expedition", {}).get("night_penalty_mult", 0.5))
+	return 1.0 / (1.0 + slow)
+
+
+## Walk the clock forward to see how long a trip takes and how much of it is at night.
+func estimate_trip(lid: String, members: Array, has_torch: bool) -> Dictionary:
+	var need := trip_minutes(lid, members)
+	var done := 0.0
+	var real := 0
+	var night := 0.0
+	var minute_of_day := GameClock.hour * 60 + GameClock.minute
+	while done < need and real < 3 * 1440:
+		var at_night := is_night_hour(((minute_of_day + real) / 60) % 24)
+		done += travel_rate(has_torch) if at_night else 1.0
+		if at_night:
+			night += 1.0
+		real += 1
+	return {"real": float(real), "night": night}
+
+
 func team_loot_mult(n: int) -> float:
 	return float(rules()["team_loot"].get(str(clampi(n, 1, 3)), 1.0))
 
@@ -153,14 +191,14 @@ func dispatch(lid: String, ids: Array) -> bool:
 	var members: Array[Survivor] = []
 	for sid: int in ids:
 		members.append(gs._survivor(sid))
-	var gear := pick_gear(members)
+	var gear := pick_gear(members, lid)
 	for id: String in gear:
 		gs.take_item(id, int(gear[id]))
 	var e := {
 		"id": _next_id, "location": lid, "members": ids.duplicate(), "gear": gear,
 		"total": trip_minutes(lid, members), "elapsed": 0.0,
 		"recalled": false, "return_left": 0.0, "loot_fraction": 1.0,
-		"rain_wear_done": false, "log": [],
+		"rain_wear_done": false, "log": [], "out_minutes": 0.0, "night_minutes": 0.0,
 	}
 	_next_id += 1
 	for s in members:
@@ -252,11 +290,11 @@ func tick() -> void:
 			recall(int(e["id"]))
 			gs.warn("WARN_EXP_CARRY", null, {"place": GameData.display_name(GameData.locations[e["location"]])})
 		if e["recalled"]:
-			e["return_left"] = float(e["return_left"]) - 1.0
+			e["return_left"] = float(e["return_left"]) - _rate_now(e)
 			if float(e["return_left"]) <= 0.0:
 				done.append(e)
 		else:
-			e["elapsed"] = float(e["elapsed"]) + 1.0
+			e["elapsed"] = float(e["elapsed"]) + _rate_now(e)
 			if float(e["elapsed"]) >= float(e["total"]):
 				done.append(e)
 	for e in done:
@@ -266,6 +304,18 @@ func tick() -> void:
 
 
 ## Multiplier on the water bar's drop for this survivor while out (canteen).
+func _rate_now(e: Dictionary) -> float:
+	e["out_minutes"] = float(e["out_minutes"]) + 1.0
+	if is_night_hour(GameClock.hour):
+		e["night_minutes"] = float(e["night_minutes"]) + 1.0
+		return travel_rate(int(e["gear"].get("torch", 0)) > 0)
+	return 1.0
+
+
+func night_share(e: Dictionary) -> float:
+	return float(e["night_minutes"]) / max(1.0, float(e["out_minutes"]))
+
+
 func water_decay_mult(s: Survivor) -> float:
 	var e := _exp_of(s)
 	if e.is_empty():
@@ -302,7 +352,12 @@ func _finish(e: Dictionary) -> void:
 			"loot": {}, "injuries": [], "trace": 0, "recalled": e["recalled"], "broken": []}
 	# loot
 	var frac := float(e["loot_fraction"])
-	var mult := team_loot_mult(able.size()) * stock_of(lid) * frac
+	var nr := night_rules()
+	var night := night_share(e)
+	var torch := int(e["gear"].get("torch", 0)) > 0
+	var night_penalty := night * (float(GameData.item("torch").get("expedition", {}).get("night_penalty_mult", 0.5)) if torch else 1.0)
+	report["night"] = night
+	var mult := team_loot_mult(able.size()) * stock_of(lid) * frac * (1.0 + float(nr.get("loot_bonus", 0.3)) * night)
 	var loot: Dictionary = {}
 	for id: String in loc["loot"]:
 		var r: Array = loc["loot"][id]
@@ -313,12 +368,24 @@ func _finish(e: Dictionary) -> void:
 		var bonus: Dictionary = GameData.item("hatchet").get("loot_bonus", {})
 		for id: String in bonus:
 			loot[id] = int(loot.get(id, 0)) + int(bonus[id])
+	var rare_mult := 1.0 + (float(nr.get("rare_mult", 2.0)) - 1.0) * night
 	for rare: Dictionary in loc.get("rare", []):
-		if not rare.has("item"):
-			continue
 		if GameClock.day < int(rare.get("from_day", 0)):
 			continue
-		if rng.randf() < float(rare["chance"]) * frac:
+		if rare.has("blueprint"):
+			if rng.randf() < float(rare["chance"]) * frac * rare_mult:
+				var bp := String(rare["blueprint"])
+				if gs.blueprints.has(bp):
+					loot["parts"] = int(loot.get("parts", 0)) + 2
+				else:
+					gs.blueprints[bp] = true
+					report["blueprint"] = bp
+					gs.change_morale(float(GameData.config["morale"]["daily"]["big_success"]))
+					gs.warn("WARN_BLUEPRINT", null, {"item": GameData.display_name(GameData.facility(bp))})
+			continue
+		if not rare.has("item"):
+			continue
+		if rng.randf() < float(rare["chance"]) * frac * rare_mult:
 			var c: Variant = rare.get("count", 1)
 			var n := rng.randi_range(int(c[0]), int(c[1])) if c is Array else int(c)
 			loot[rare["item"]] = int(loot.get(rare["item"], 0)) + n
@@ -333,7 +400,7 @@ func _finish(e: Dictionary) -> void:
 		else:
 			loot[id] = take
 	# injuries
-	var p := injury_chance(lid, able, e["gear"]) * frac + float(_day_injury_add())
+	var p := injury_chance(lid, able, e["gear"]) * frac * (1.0 + (float(nr.get("injury_mult", 2.0)) - 1.0) * night_penalty) + float(_day_injury_add())
 	var nurse_along := false
 	for s in able:
 		if s.job == "nurse":
@@ -366,6 +433,8 @@ func _finish(e: Dictionary) -> void:
 			gs.wear(id)
 	if e["rain_wear_done"]:
 		gs.wear("poncho")
+	if torch and night > 0.0:
+		gs.wear("torch")
 	for s in members:
 		s.carried_food = 0
 		s.carried_water = 0

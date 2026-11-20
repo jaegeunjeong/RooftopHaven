@@ -11,7 +11,8 @@
 			"built_at_start": true,
 			"effects": {
 				"station": "workbench"
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "rain_collector",
@@ -29,7 +30,8 @@
 				"daily_rain": {
 					"dirty_water": 12
 				}
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "stove",
@@ -48,7 +50,8 @@
 			"effects": {
 				"station": "stove",
 				"fire_hours_per_fuel": 4
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "bed",
@@ -67,7 +70,8 @@
 			"effects": {
 				"sleep_gain": 7,
 				"sleepers": 1
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "storage_shelf",
@@ -84,7 +88,8 @@
 			"built_at_start": false,
 			"effects": {
 				"storage_slots": 20
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "barricade",
@@ -103,7 +108,8 @@
 			"effects": {
 				"defense": 1,
 				"durability": 5
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "nail_board",
@@ -121,7 +127,8 @@
 				"defense": 1,
 				"infected_strength": -1,
 				"breaks_after_raids": 3
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "can_alarm",
@@ -137,7 +144,8 @@
 			"built_at_start": false,
 			"effects": {
 				"alarm": true
-			}
+			},
+			"blueprint": false
 		},
 		{
 			"id": "rat_trap",
@@ -162,7 +170,224 @@
 					]
 				},
 				"daily_trace": 1
-			}
+			},
+			"blueprint": false
+		},
+		{
+			"id": "campfire",
+			"name": "FAC_CAMPFIRE",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"wood": 3,
+				"scrap": 1
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 1,
+			"built_at_start": false,
+			"effects": {
+				"light": true,
+				"fuel_per_night": 1,
+				"trace_per_night": 1
+			},
+			"blueprint": false,
+			"max_count": 1
+		},
+		{
+			"id": "watch_post",
+			"name": "FAC_WATCH_POST",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"wood": 5,
+				"rope": 1
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"warning_minutes": 120,
+				"guard_bonus": 1
+			},
+			"blueprint": false,
+			"max_count": 1
+		},
+		{
+			"id": "rain_collector_2",
+			"name": "FAC_RAIN_COLLECTOR_2",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"plastic": 4,
+				"scrap": 2
+			},
+			"requires": [
+				"hammer",
+				"rain_collector"
+			],
+			"build_hours": 2,
+			"built_at_start": false,
+			"effects": {
+				"daily": {
+					"dirty_water": 4
+				},
+				"daily_rain": {
+					"dirty_water": 6
+				}
+			},
+			"blueprint": false,
+			"upgrade_of": "rain_collector",
+			"max_count": 1
+		},
+		{
+			"id": "work_lamp",
+			"name": "FAC_WORK_LAMP",
+			"tier": "early",
+			"kind": "facility",
+			"cost": {
+				"battery": 1,
+				"scrap": 1,
+				"rope": 1
+			},
+			"requires": [],
+			"build_hours": 1,
+			"built_at_start": false,
+			"effects": {
+				"light": true,
+				"trace_per_night": 1
+			},
+			"blueprint": false,
+			"max_count": 1
+		},
+		{
+			"id": "reinforced_door",
+			"name": "FAC_REINFORCED_DOOR",
+			"tier": "mid",
+			"kind": "defense",
+			"cost": {
+				"wood": 3,
+				"scrap": 3
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 3,
+			"built_at_start": false,
+			"effects": {
+				"defense": 2,
+				"durability": 5
+			},
+			"blueprint": false
+		},
+		{
+			"id": "smoker",
+			"name": "FAC_SMOKER",
+			"tier": "mid",
+			"kind": "facility",
+			"cost": {
+				"wood": 4,
+				"scrap": 2
+			},
+			"requires": [
+				"hammer",
+				"stove"
+			],
+			"build_hours": 4,
+			"built_at_start": false,
+			"effects": {
+				"station": "smoker",
+				"daily_trace": 1
+			},
+			"blueprint": false,
+			"max_count": 1
+		},
+		{
+			"id": "infirmary_bed",
+			"name": "FAC_INFIRMARY_BED",
+			"tier": "mid",
+			"kind": "facility",
+			"cost": {
+				"wood": 2,
+				"cloth": 2,
+				"disinfectant": 1
+			},
+			"requires": [
+				"bed"
+			],
+			"build_hours": 4,
+			"built_at_start": false,
+			"effects": {
+				"heal_speed": 2.0
+			},
+			"blueprint": false,
+			"max_count": 1
+		},
+		{
+			"id": "workbench_2",
+			"name": "FAC_WORKBENCH_2",
+			"tier": "mid",
+			"kind": "facility",
+			"cost": {
+				"scrap": 6,
+				"parts": 2
+			},
+			"requires": [
+				"hammer"
+			],
+			"build_hours": 4,
+			"built_at_start": false,
+			"effects": {
+				"station": "workbench_2"
+			},
+			"blueprint": true,
+			"upgrade_of": "workbench",
+			"max_count": 1
+		},
+		{
+			"id": "barbed_wire",
+			"name": "FAC_BARBED_WIRE",
+			"tier": "mid",
+			"kind": "defense",
+			"cost": {
+				"metal_plate": 2,
+				"scrap": 2
+			},
+			"requires": [
+				"workbench_2"
+			],
+			"build_hours": 4,
+			"built_at_start": false,
+			"effects": {
+				"defense": 2,
+				"durability": 5
+			},
+			"blueprint": false
+		},
+		{
+			"id": "watchtower",
+			"name": "FAC_WATCHTOWER",
+			"tier": "mid",
+			"kind": "facility",
+			"cost": {
+				"metal_plate": 3,
+				"wood": 4
+			},
+			"requires": [
+				"barricade",
+				"workbench_2"
+			],
+			"build_hours": 4,
+			"built_at_start": false,
+			"effects": {
+				"warning_minutes": 180,
+				"guard_mult": 1.5
+			},
+			"blueprint": false,
+			"max_count": 1
 		}
 	],
 	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."

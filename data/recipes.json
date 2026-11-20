@@ -266,6 +266,88 @@
 			"name": "ITEM_MEAT_SKEWER"
 		},
 		{
+			"id": "torch",
+			"output": {
+				"torch": 1
+			},
+			"inputs": {
+				"wood": 1,
+				"cloth": 1
+			},
+			"station": "workbench",
+			"minutes": 15,
+			"name": "ITEM_TORCH"
+		},
+		{
+			"id": "spike_trap",
+			"output": {
+				"spike_trap": 1
+			},
+			"inputs": {
+				"wood": 3,
+				"scrap": 2
+			},
+			"station": "workbench",
+			"minutes": 60,
+			"name": "ITEM_SPIKE_TRAP"
+		},
+		{
+			"id": "metal_plate",
+			"output": {
+				"metal_plate": 1
+			},
+			"inputs": {
+				"scrap": 3
+			},
+			"station": "workbench_2",
+			"minutes": 30,
+			"name": "ITEM_METAL_PLATE"
+		},
+		{
+			"id": "jerky",
+			"output": {
+				"jerky": 1
+			},
+			"inputs": {
+				"small_meat": 2
+			},
+			"station": "smoker",
+			"minutes": 120,
+			"fuel": 1,
+			"name": "ITEM_JERKY"
+		},
+		{
+			"id": "jerky_veg",
+			"output": {
+				"jerky": 1
+			},
+			"inputs": {
+				"ingredients": 2
+			},
+			"station": "smoker",
+			"minutes": 120,
+			"fuel": 1,
+			"name": "RECIPE_JERKY_VEG"
+		},
+		{
+			"id": "salvage",
+			"output": {},
+			"inputs": {},
+			"station": "workbench",
+			"minutes": 120,
+			"salvage": {
+				"weights": {
+					"wood": 40,
+					"scrap": 30,
+					"cloth": 20,
+					"plastic": 10
+				},
+				"per_day": 3,
+				"trace_first": 1
+			},
+			"name": "RECIPE_SALVAGE"
+		},
+		{
 			"id": "ration",
 			"output": {
 				"ration": 1

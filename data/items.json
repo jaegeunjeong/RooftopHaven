@@ -238,6 +238,33 @@
 			"name": "ITEM_CAN_LURE",
 			"category": "consumable",
 			"slot": "consumable"
+		},
+		{
+			"id": "torch",
+			"name": "ITEM_TORCH",
+			"category": "survival",
+			"durability": 1,
+			"expedition": {
+				"night_penalty_mult": 0.5
+			}
+		},
+		{
+			"id": "metal_plate",
+			"name": "ITEM_METAL_PLATE",
+			"category": "material"
+		},
+		{
+			"id": "jerky",
+			"name": "ITEM_JERKY",
+			"category": "food",
+			"food": 35,
+			"spoil_days": 7
+		},
+		{
+			"id": "spike_trap",
+			"name": "ITEM_SPIKE_TRAP",
+			"category": "consumable",
+			"raid_strength": -2
 		}
 	],
 	"_source": "Obsidian rooftop-haven/04-수치설계 (2026-11-18). Edit numbers here; the notes are the design record."

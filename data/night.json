@@ -3,43 +3,107 @@
 	"infected": {
 		"chance_per_trace": 0.05,
 		"chance_max": 0.9,
-		"base_from_day": 6,
-		"base_chance": 0.15,
+		"base_chance_by_day": [
+			[
+				1,
+				5,
+				0.2
+			],
+			[
+				6,
+				30,
+				0.35
+			]
+		],
 		"rain_mult": 0.5,
 		"strength_by_day": [
 			[
 				1,
-				5,
+				2,
 				2
 			],
 			[
+				3,
+				5,
+				3
+			],
+			[
 				6,
+				7,
+				5
+			],
+			[
+				8,
 				10,
-				4
+				7
 			],
 			[
 				11,
 				15,
-				5
+				8
 			],
 			[
 				16,
 				20,
-				8
+				10
 			],
 			[
 				21,
 				25,
-				11
+				12
 			],
 			[
 				26,
 				30,
-				13
+				14
 			]
 		],
 		"strength_per_5_trace": 1,
-		"final_night_bonus": 3
+		"final_night_bonus": 4
+	},
+	"raiders": {
+		"first_day": [
+			8,
+			9
+		],
+		"interval_days": [
+			4,
+			6
+		],
+		"strength_by_day": [
+			[
+				6,
+				10,
+				7
+			],
+			[
+				11,
+				15,
+				8
+			],
+			[
+				16,
+				20,
+				10
+			],
+			[
+				21,
+				25,
+				13
+			],
+			[
+				26,
+				30,
+				15
+			]
+		]
+	},
+	"warning": {
+		"guard_minutes": 60
+	},
+	"night_work": {
+		"needs_light": true,
+		"until_hour": 2
 	},
 	"defense": {
 		"guard_value": 1,
@@ -56,14 +120,17 @@
 			"min_margin": 0,
 			"result": "held",
 			"guard_light_injury": 0.3,
-			"defense_durability": -1
+			"defense_durability": -1,
+			"guard_health": -5
 		},
 		{
 			"min_margin": -2,
 			"result": "partial",
 			"guard_injury": 0.6,
 			"serious_share": 0.25,
-			"infected_break_facilities": 1
+			"infected_break_facilities": 1,
+			"raider_steal": 0.1,
+			"victim_health": -15
 		},
 		{
 			"min_margin": -99,
@@ -77,7 +144,8 @@
 				1,
 				2
 			],
-			"morale": -10
+			"morale": -10,
+			"victim_health": -35
 		}
 	],
 	"trace": {

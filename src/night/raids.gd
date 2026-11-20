@@ -1,17 +1,23 @@
 class_name Raids
 extends RefCounted
-## Night raids by the infected (grey-box step 5). Owned by GameState.
-## At 22:00 the night is rolled from the trace; if they come, they arrive at a
-## random hour before dawn and the base's defense is compared with their
-## strength. Raiders (who target the storeroom) are not in the 10-day prototype.
+## Night raids (grey-box step 5, retuned after the first playtest).
+## At 22:00 the night is rolled: the infected come with a base chance plus the
+## trace, and from day 8 raiders come every few days for the storeroom. Each
+## raid arrives at a random time before dawn. Someone awake on watch hears them
+## coming and the player can wake everybody up. Then defense is compared with
+## strength and the outcome table is applied.
 
 signal changed
 signal resolved(report: Dictionary)
+signal warning(info: Dictionary)
 
 var gs: Node
-var tonight: Dictionary = {}     # {} or {"minute": absolute minute, "strength": int, "chance": float}
+var tonight: Array[Dictionary] = []   # {"kind", "minute", "strength", "warned"}
 var history: Array[Dictionary] = []
-var durability: Dictionary = {}  # defense facility id -> Array[int] remaining per copy
+var durability: Dictionary = {}       # defense facility id -> Array[int] per copy
+var raider_day: int = 0
+var all_awake: bool = false           # "wake everyone" was pressed tonight
+var _saved_guards: Dictionary = {}
 
 
 func _init(state: Node) -> void:
@@ -22,6 +28,10 @@ func reset() -> void:
 	tonight.clear()
 	history.clear()
 	durability.clear()
+	all_awake = false
+	_saved_guards.clear()
+	var rd: Array = cfg()["raiders"]["first_day"]
+	raider_day = gs._rng.randi_range(int(rd[0]), int(rd[1]))
 
 
 func cfg() -> Dictionary:
@@ -30,15 +40,20 @@ func cfg() -> Dictionary:
 
 # ------------------------------------------------------------------ estimates for the screen
 
-## Chance that the infected come tonight, from the current trace.
+func _by_day(table: Array, day: int, fallback: float) -> float:
+	for row: Array in table:
+		if day >= int(row[0]) and day <= int(row[1]):
+			return float(row[2])
+	return fallback
+
+
+## Chance that the infected come tonight (base chance for the day + trace).
 func chance_tonight() -> float:
 	var inf: Dictionary = cfg()["infected"]
 	var day := GameClock.day
 	if _is_final_night(day):
 		return 1.0
-	var p: float = float(gs.trace) * float(inf["chance_per_trace"])
-	if day >= int(inf["base_from_day"]):
-		p += float(inf["base_chance"])
+	var p: float = _by_day(inf["base_chance_by_day"], day, 0.2) + float(gs.trace) * float(inf["chance_per_trace"])
 	p = min(p, float(inf["chance_max"]))
 	if gs.weather_today() == "rain":
 		p *= float(inf["rain_mult"])
@@ -48,11 +63,7 @@ func chance_tonight() -> float:
 func strength_tonight() -> int:
 	var inf: Dictionary = cfg()["infected"]
 	var day := GameClock.day
-	var base := 2
-	for row: Array in inf["strength_by_day"]:
-		if day >= int(row[0]) and day <= int(row[1]):
-			base = int(row[2])
-	var st := base + int(floor(float(gs.trace) / 5.0)) * int(inf["strength_per_5_trace"])
+	var st := int(_by_day(inf["strength_by_day"], day, 2.0)) + int(floor(float(gs.trace) / 5.0)) * int(inf["strength_per_5_trace"])
 	if _is_final_night(day):
 		st += int(inf["final_night_bonus"])
 	for fid: String in gs.built:
@@ -61,11 +72,19 @@ func strength_tonight() -> int:
 	return max(0, st)
 
 
-## Survivors who would stand guard: with a can alarm everyone at the base wakes
-## up, otherwise only those on night watch. At most `guard_cap` count.
+func raider_strength() -> int:
+	return int(_by_day(cfg()["raiders"]["strength_by_day"], GameClock.day, 5.0))
+
+
+func raiders_tonight() -> bool:
+	return GameClock.day == raider_day and GameClock.day < int(GameData.config["prototype"]["run_days"])
+
+
+## Who fights: with a can alarm (or after "wake everyone") all at the base,
+## otherwise only those on watch. At most `guard_cap` count.
 func guards() -> Array[Survivor]:
 	var out: Array[Survivor] = []
-	var alarm := int(gs.built.get("can_alarm", 0)) > 0
+	var alarm := int(gs.built.get("can_alarm", 0)) > 0 or all_awake
 	for s in gs.survivors:
 		if not s.is_active() or not s.at_base or s.health < 30.0:
 			continue
@@ -79,8 +98,14 @@ func guards() -> Array[Survivor]:
 
 func defense() -> int:
 	var g := guards()
+	var guard_points := float(g.size()) * float(cfg()["defense"]["guard_value"])
+	for fid: String in gs.built:
+		var eff: Dictionary = GameData.facility(fid).get("effects", {})
+		if int(gs.built[fid]) > 0 and not g.is_empty():
+			guard_points *= float(eff.get("guard_mult", 1.0))
+			guard_points += float(eff.get("guard_bonus", 0))
 	var weapons: int = min(g.size(), gs.count("iron_pipe"))
-	return gs.defense_from_facilities() + g.size() * int(cfg()["defense"]["guard_value"]) + weapons
+	return gs.defense_from_facilities() + int(floor(guard_points)) + weapons
 
 
 func outcome_for(margin: int) -> String:
@@ -90,37 +115,91 @@ func outcome_for(margin: int) -> String:
 	return "breach"
 
 
+## How long before a raid someone on watch hears it (0 = nobody will).
+func warning_minutes() -> int:
+	var awake_guard := false
+	for s in gs.survivors:
+		if s.is_active() and s.at_base and s.guard:
+			awake_guard = true
+	if not awake_guard:
+		return 0
+	var best := int(cfg()["warning"]["guard_minutes"])
+	for fid: String in gs.built:
+		if int(gs.built[fid]) > 0:
+			best = max(best, int(GameData.facility(fid).get("effects", {}).get("warning_minutes", 0)))
+	return best
+
+
 # ------------------------------------------------------------------ the night
 
 func tick() -> void:
-	var raid_hour := int(cfg().get("raid_check_hour", 22))
-	if GameClock.hour == raid_hour and GameClock.minute == 0:
+	if GameClock.hour == int(cfg().get("raid_check_hour", 22)) and GameClock.minute == 0:
 		_roll_night()
-	if not tonight.is_empty() and _now() >= int(tonight["minute"]):
-		_resolve()
+	var now := _now()
+	for r in tonight.duplicate():
+		if not r["warned"]:
+			var w := warning_minutes()
+			if w > 0 and now >= int(r["minute"]) - w:
+				r["warned"] = true
+				warning.emit({"kind": r["kind"], "minutes": int(r["minute"]) - now})
+				gs.warn("WARN_RAID_HEARD_" + String(r["kind"]).to_upper(), null)
+		if now >= int(r["minute"]):
+			tonight.erase(r)
+			_resolve(r)
+
+
+func morning() -> void:
+	tonight.clear()
+	if all_awake:
+		for s in gs.survivors:
+			s.guard = bool(_saved_guards.get(s.id, false))
+		all_awake = false
+		_saved_guards.clear()
+	changed.emit()
+
+
+## "Wake everyone": all at the base get up and fight tonight.
+func wake_all() -> void:
+	if all_awake:
+		return
+	all_awake = true
+	_saved_guards.clear()
+	for s in gs.survivors:
+		_saved_guards[s.id] = s.guard
+		if s.is_active() and s.at_base:
+			s.guard = true
+	gs.warn("WARN_WOKE_ALL", null)
+	changed.emit()
 
 
 func _roll_night() -> void:
 	tonight.clear()
-	var p := chance_tonight()
-	if gs._rng.randf() >= p:
-		return
-	# they arrive between 23:00 and 04:00
-	var offset: int = gs._rng.randi_range(60, 6 * 60)
-	tonight = {"minute": _now() + offset, "strength": strength_tonight(), "chance": p}
+	var rng: RandomNumberGenerator = gs._rng
+	if rng.randf() < chance_tonight():
+		tonight.append({"kind": "infected", "minute": _now() + rng.randi_range(60, 6 * 60),
+				"strength": strength_tonight(), "warned": false})
+	if raiders_tonight():
+		tonight.append({"kind": "raiders", "minute": _now() + rng.randi_range(60, 6 * 60),
+				"strength": raider_strength(), "warned": false})
+		var iv: Array = cfg()["raiders"]["interval_days"]
+		raider_day = GameClock.day + rng.randi_range(int(iv[0]), int(iv[1]))
 	changed.emit()
 
 
-func _resolve() -> void:
-	var st := int(tonight["strength"])
-	tonight.clear()
+func _resolve(raid: Dictionary) -> void:
+	var st := int(raid["strength"])
+	var kind := String(raid["kind"])
+	var trap_used := false
+	if gs.count("spike_trap") > 0:
+		gs.take_item("spike_trap")
+		st += int(GameData.item("spike_trap").get("raid_strength", -2))
+		trap_used = true
 	var g := guards()
 	var dfn := defense()
-	var margin := dfn - st
-	var result := outcome_for(margin)
+	var result := outcome_for(dfn - st)
 	var rng: RandomNumberGenerator = gs._rng
-	var report := {"kind": "raid", "strength": st, "defense": dfn, "guards": g.size(),
-			"result": result, "injuries": [], "broken": [], "lost": {}}
+	var report := {"kind": "raid", "enemy": kind, "strength": st, "defense": dfn, "guards": g.size(),
+			"result": result, "injuries": [], "broken": [], "lost": {}, "trap": trap_used}
 	var at_base: Array[Survivor] = []
 	for s in gs.survivors:
 		if s.is_active() and s.at_base:
@@ -131,8 +210,11 @@ func _resolve() -> void:
 			row = o
 	match result:
 		"perfect":
-			gs.trace = max(0.0, float(gs.trace) + float(row.get("trace", -2)))
+			if kind == "infected":
+				gs.trace = max(0.0, float(gs.trace) + float(row.get("trace", -2)))
 		"held":
+			for s in g:
+				s.health = max(0.0, s.health + float(row.get("guard_health", 0)))
 			if not g.is_empty() and rng.randf() < float(row.get("guard_light_injury", 0.3)):
 				var s: Survivor = g[rng.randi_range(0, g.size() - 1)]
 				gs.injure(s, "light")
@@ -142,35 +224,41 @@ func _resolve() -> void:
 			var hurt: Array[Survivor] = g if not g.is_empty() else at_base.slice(0, 1)
 			for s in hurt:
 				if rng.randf() < float(row.get("guard_injury", 0.6)):
-					var kind := "serious" if rng.randf() < float(row.get("serious_share", 0.25)) else "light"
-					gs.injure(s, kind)
-					report["injuries"].append({"id": s.id, "kind": kind})
-			for i in int(row.get("infected_break_facilities", 1)):
-				_break_facility(report)
+					var k := "serious" if rng.randf() < float(row.get("serious_share", 0.25)) else "light"
+					s.health = max(0.0, s.health + float(row.get("victim_health", 0)))
+					gs.injure(s, k)
+					report["injuries"].append({"id": s.id, "kind": k})
+			if kind == "raiders":
+				_steal(float(row.get("raider_steal", 0.1)), report)
+			else:
+				for i in int(row.get("infected_break_facilities", 1)):
+					_break_facility(report)
 		_:
-			var n_hurt := rng.randi_range(1, 2)
 			var pool := at_base.duplicate()
-			for i in min(n_hurt, pool.size()):
+			for i in min(rng.randi_range(1, 2), pool.size()):
 				var s: Survivor = pool.pop_at(rng.randi_range(0, pool.size() - 1))
+				s.health = max(0.0, s.health + float(row.get("victim_health", 0)))
 				gs.injure(s, "serious")
 				report["injuries"].append({"id": s.id, "kind": "serious"})
-			var loss := float(row.get("storage_loss", 0.25))
-			for id: String in gs.inventory.keys():
-				var n := int(floor(gs.count(id) * loss))
-				if n > 0:
-					gs.take_item(id, n)
-					report["lost"][id] = n
+			_steal(float(row.get("storage_loss", 0.25)), report)
 			var br: Array = row.get("break_facilities", [1, 2])
 			for i in rng.randi_range(int(br[0]), int(br[1])):
 				_break_facility(report)
 			gs.change_morale(float(row.get("morale", -10)))
-	# nail boards wear out after a few raids
 	_count_nail_boards(report)
 	history.append(report)
 	gs.warn("WARN_RAID_" + result.to_upper(), null)
 	changed.emit()
 	gs.built_changed.emit()
 	resolved.emit(report)
+
+
+func _steal(fraction: float, report: Dictionary) -> void:
+	for id: String in gs.inventory.keys():
+		var n := int(floor(gs.count(id) * fraction))
+		if n > 0:
+			gs.take_item(id, n)
+			report["lost"][id] = int(report["lost"].get(id, 0)) + n
 
 
 func on_built(fid: String) -> void:
